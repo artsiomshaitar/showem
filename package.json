@@ -1,0 +1,23 @@
+{
+  "name": "opendemo",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "opendemo": "src/cli.ts"
+  },
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "^1.1.0",
+    "playwright-core": "^1.64.1"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^7"
+  }
+}
