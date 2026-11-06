@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Northwind</title>
+<style>
+  :root { --ink: #17191c; --muted: #6b7076; --line: #e7e5e0; --bg: #f6f5f2; --accent: #0f766e; --accent-soft: #e6f2f0; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif; color: var(--ink); background: var(--bg); min-height: 100vh; }
+  .view { display: none; }
+  .view.on { display: block; }
+  .logo { width: 56px; height: 56px; border-radius: 15px; background: var(--accent); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 24px; }
+  .center { padding: 120px 28px 0; text-align: center; }
+  .center .logo { margin: 0 auto 22px; }
+  h1 { margin: 0 0 8px; font-size: 27px; letter-spacing: -0.01em; }
+  .muted { color: var(--muted); }
+  form { margin-top: 30px; text-align: left; }
+  label { font-size: 14px; font-weight: 600; color: var(--muted); }
+  input { width: 100%; margin: 8px 0 16px; font: inherit; font-size: 17px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: #fff; outline: none; }
+  input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  button { width: 100%; font: inherit; font-weight: 650; font-size: 17px; padding: 15px; border: 0; border-radius: 12px; background: var(--accent); color: #fff; }
+  .bar { display: flex; align-items: center; gap: 12px; padding: 14px 20px; background: #fff; border-bottom: 1px solid var(--line); }
+  .bar .logo { width: 34px; height: 34px; border-radius: 9px; font-size: 16px; }
+  .bar b { font-size: 18px; }
+  .me { margin-left: auto; width: 34px; height: 34px; border-radius: 50%; background: #b45309; color: #fff; display: grid; place-items: center; font-size: 13px; font-weight: 650; }
+  .feed { padding: 22px 18px; }
+  .hello { font-size: 24px; font-weight: 700; margin: 0 0 4px; letter-spacing: -0.01em; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 26px 2px 10px; }
+  ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  .post { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 15px 16px; }
+  .post .meta { color: var(--muted); font-size: 13px; margin-top: 6px; }
+  .post.new { animation: arrive .5s cubic-bezier(.2, .9, .3, 1.2), glow 3s ease-out; }
+  .tag { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .04em; color: var(--accent); background: var(--accent-soft); border-radius: 99px; padding: 2px 8px; margin-bottom: 7px; }
+  @keyframes arrive { from { opacity: 0; transform: translateY(-14px) scale(.97); } }
+  @keyframes glow { 0%, 50% { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); } }
+</style>
+</head>
+<body>
+<section class="view center" id="empty">
+  <div class="logo">N</div>
+  <h1>No workspace yet</h1>
+  <p class="muted">Open the invite link your admin sent you to join the team.</p>
+</section>
+
+<section class="view center" id="join">
+  <div class="logo">N</div>
+  <h1>Join Northwind</h1>
+  <p class="muted">Alex Kim invited you to the team.</p>
+  <form id="join-form">
+    <label for="name">Your name</label>
+    <input id="name" autocomplete="off" placeholder="First and last name">
+    <button>Join team</button>
+  </form>
+</section>
+
+<section class="view" id="home">
+  <div class="bar"><div class="logo">N</div><b>Northwind</b><div class="me" id="me"></div></div>
+  <div class="feed">
+    <p class="hello" id="hello"></p>
+    <div class="muted" id="team"></div>
+    <h2>Announcements</h2>
+    <ul id="feed"></ul>
+  </div>
+</section>
+
+<script>
+  const show = (id) => document.querySelectorAll(".view").forEach((v) => v.classList.toggle("on", v.id === id));
+  const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  const ago = (at) => {
+    const s = (Date.now() - at) / 1000;
+    if (s < 60) return "just now";
+    if (s < 3600) return `${Math.round(s / 60)} min ago`;
+    if (s < 86400) return `${Math.round(s / 3600)} h ago`;
+    return `${Math.round(s / 86400)} days ago`;
+  };
+  const path = location.pathname;
+
+  if (path.startsWith("/invite/")) {
+    show("join");
+    document.getElementById("join-form").onsubmit = async (e) => {
+      e.preventDefault();
+      const token = path.split("/").pop();
+      const res = await fetch("/api/join", { method: "POST", body: JSON.stringify({ token, name: document.getElementById("name").value }) });
+      if (res.ok) location.href = "/feed";
+    };
+  } else if (path === "/feed") {
+    fetch("/api/me").then((r) => r.json()).then((me) => {
+      if (!me) return show("empty");
+      show("home");
+      document.getElementById("hello").textContent = `Welcome, ${me.name.split(" ")[0]}`;
+      document.getElementById("me").textContent = me.name.split(" ").map((w) => w[0]).join("").slice(0, 2);
+      let seen = null;
+      new EventSource("/api/events").onmessage = (e) => {
+        const { members, posts } = JSON.parse(e.data);
+        document.getElementById("team").textContent = `You and ${members.length - 1} teammates`;
+        document.getElementById("feed").replaceChildren(...posts.map((p) => {
+          const li = document.createElement("li");
+          const fresh = seen && !seen.has(p.id);
+          li.className = fresh ? "post new" : "post";
+          li.innerHTML = `${fresh ? '<span class="tag">NEW</span>' : ""}<div>${esc(p.text)}</div><div class="meta">${esc(p.author)} · ${ago(p.at)}</div>`;
+          return li;
+        }));
+        seen = new Set(posts.map((p) => p.id));
+      };
+    });
+  } else {
+    show("empty");
+  }
+</script>
+</body>
+</html>

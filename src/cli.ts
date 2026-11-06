@@ -2,7 +2,7 @@
 import { join } from "node:path";
 import { record } from "./record.ts";
 import { render } from "./render.ts";
-import { loadScript } from "./script.ts";
+import { loadScript, screensOf } from "./script.ts";
 import type { Recording } from "./types.ts";
 
 const USAGE = `Usage: opendemo <command> <script.json>
@@ -29,9 +29,9 @@ let rec: Recording;
 if (command === "render") {
   rec = await Bun.file(join(workDir, "recording.json")).json();
 } else {
-  console.error(`Recording ${script.url}`);
+  console.error(`Recording ${Object.values(screensOf(script)).map((s) => s.url).join(", ")}`);
   rec = await record(script, workDir);
-  console.error(`Recorded ${(rec.duration / 1000).toFixed(1)}s, ${rec.frames.length} frames`);
+  console.error(`Recorded ${(rec.duration / 1000).toFixed(1)}s, ${Object.values(rec.screens).reduce((n, s) => n + s.frames.length, 0)} frames`);
 }
 
 if (command !== "record") {

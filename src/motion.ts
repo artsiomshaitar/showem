@@ -29,3 +29,18 @@ export function cursorPath(from: Point, to: Point): (k: number) => Point {
     };
   };
 }
+
+/** How long a switch between screens takes. Every transition uses it, so it can be changed without recording again. */
+export const TRANSITION_MS = 800;
+/** Apple's default spring response: roughly how long the spring takes to get to its target. */
+const SPRING_RESPONSE_MS = 500;
+
+/**
+ * A critically damped spring (damping ratio 1, as for iOS screen transitions) over a transition,
+ * as a function of progress 0..1: it picks up speed right away and eases into place without overshooting.
+ */
+export function springEase(k: number) {
+  const w = ((2 * Math.PI) / SPRING_RESPONSE_MS) * TRANSITION_MS;
+  const spring = (x: number) => 1 - (1 + w * x) * Math.exp(-w * x);
+  return k <= 0 ? 0 : k >= 1 ? 1 : spring(k) / spring(1);
+}

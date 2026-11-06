@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { DEFAULT_ZOOM, outputOf, resolveScript, stepsKey, styleOf, zoomOf } from "../src/script.ts";
+import { checkScript, DEFAULT_ZOOM, fillStep, outputOf, resolveScript, screensOf, stepsKey, styleOf, zoomOf } from "../src/script.ts";
 import type { Step } from "../src/types.ts";
-import { makeScript } from "./fixtures.ts";
+import { makeScript, VIEWPORT } from "./fixtures.ts";
 
 describe("zoomOf", () => {
   const click = (zoom: unknown) => ({ action: "click", target: "#a", zoom }) as Step;
@@ -38,6 +38,15 @@ describe("resolveScript", () => {
     expect(outPath).toBe("/work/demos/intro.demo.mp4");
   });
 
+  test("resolves screen URLs, and leaves URLs with saved values for later", () => {
+    const { script } = resolveScript(
+      makeScript({ url: undefined, screens: { a: { url: "./a.html" } }, steps: [{ action: "goto", url: "${link}" }] }),
+      scriptPath,
+    );
+    expect(script.screens?.a?.url).toBe("file:///work/demos/a.html");
+    expect(script.steps).toEqual([{ action: "goto", url: "${link}" }]);
+  });
+
   test("keeps absolute paths and web URLs", () => {
     const { script, outPath } = resolveScript(makeScript({ url: "http://localhost:3000", output: { path: "/tmp/out.mp4" } }), scriptPath);
     expect(script.url).toBe("http://localhost:3000");
@@ -57,6 +66,11 @@ describe("stepsKey", () => {
     expect(stepsKey([{ action: "click", target: "#other", zoom: { include: ["#list li"] } }])).not.toBe(stepsKey(base));
     expect(stepsKey([{ action: "click", target: "#add", zoom: { include: [] } }])).not.toBe(stepsKey(base));
     expect(stepsKey([...base, { action: "pause", ms: 100 }])).not.toBe(stepsKey(base));
+    expect(stepsKey([{ ...base[0]!, caption: "Add a row" }])).not.toBe(stepsKey(base));
+  });
+
+  test("ignores the switch transition, which only changes the render", () => {
+    expect(stepsKey([{ action: "switch", screen: "a", transition: "slide" }])).toBe(stepsKey([{ action: "switch", screen: "a" }]));
   });
 
   test("does not depend on key order", () => {
@@ -70,4 +84,54 @@ test("defaults and limits", () => {
   expect(style.motionBlur).toBe(1);
   expect(style.shadow).toBe(0);
   expect(style.travelMs).toBe(800);
+});
+
+describe("screensOf", () => {
+  test("a script without screens has one, with the default frame", () => {
+    expect(screensOf(makeScript())).toEqual({ main: { url: "https://example.com", frame: "browser-safari", viewport: VIEWPORT } });
+  });
+
+  test("a phone frame brings its own screen size", () => {
+    const screens = screensOf(makeScript({ screens: { m: { url: "x", frame: "mobile-iphone", viewport: { width: 1, height: 1 } } } }));
+    expect(screens.m?.viewport).toEqual({ width: 393, height: 798 });
+  });
+});
+
+describe("checkScript", () => {
+  const screens = { admin: { url: "a" }, member: { url: "b", frame: "mobile-iphone" as const } };
+
+  test("accepts switches to known screens and values saved before use", () => {
+    expect(() =>
+      checkScript(makeScript({
+        screens,
+        steps: [
+          { action: "save", as: "link", target: "#link", attribute: "href" },
+          { action: "switch", screen: "member" },
+          { action: "goto", url: "${link}" },
+        ],
+      })),
+    ).not.toThrow();
+  });
+
+  test("rejects unknown screens and frames", () => {
+    expect(() => checkScript(makeScript({ screens, steps: [{ action: "switch", screen: "nope" }] }))).toThrow(/no screen "nope"/);
+    expect(() => checkScript(makeScript({ screens: { a: { url: "a", frame: "tv" as never } } }))).toThrow(/unknown frame/);
+    expect(() => checkScript(makeScript({ screens, steps: [{ action: "switch", screen: "admin", transition: "zoom" as never }] }))).toThrow(/unknown transition/);
+  });
+
+  test("rejects screen names that don't start with a letter, since those would be put out of order", () => {
+    expect(() => checkScript(makeScript({ screens: { "2": { url: "a" } } }))).toThrow(/must start with a letter/);
+    expect(() => checkScript(makeScript({ screens: { "my screen": { url: "a" } } }))).toThrow(/must start with a letter/);
+  });
+
+  test("rejects a value used before it is saved", () => {
+    const steps: Step[] = [{ action: "goto", url: "${link}" }, { action: "save", as: "link", from: "url" }];
+    expect(() => checkScript(makeScript({ steps }))).toThrow(/Step 1 \(goto\) uses \$\{link\}/);
+  });
+});
+
+test("fillStep fills saved values into every text field", () => {
+  const step: Step = { action: "type", target: "#row-${id}", text: "Order ${id}", caption: "Open ${id}" };
+  expect(fillStep(step, { id: "7" })).toEqual({ action: "type", target: "#row-7", text: "Order 7", caption: "Open 7" });
+  expect(() => fillStep(step, {})).toThrow(/\$\{id\}/);
 });

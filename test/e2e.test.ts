@@ -42,10 +42,10 @@ afterAll(() => rm(dir, { recursive: true, force: true }));
 
 test("records every step, including a relative goto", () => {
   expect(rec.steps).toHaveLength(4);
-  expect(rec.urls.map((u) => u.url.split("/").pop())).toEqual(["start.html", "form.html"]);
+  expect(rec.screens.main?.urls.map((u) => u.url.split("/").pop())).toEqual(["start.html", "form.html"]);
   expect(rec.steps[1]?.caret?.length).toBe(4);
   expect(rec.steps[2]?.shotBox).toBeDefined();
-  expect(rec.frames.length).toBeGreaterThan(0);
+  expect(rec.screens.main?.frames.length).toBeGreaterThan(0);
 });
 
 test("renders a video with one frame per output tick", async () => {

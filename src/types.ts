@@ -36,10 +36,28 @@ export type Step = StepBase &
     | { action: "scroll"; y: number }
     | { action: "waitFor"; target: string }
     | { action: "pause"; ms: number }
+    | { action: "switch"; screen: string; transition?: Transition }
+    | ({ action: "save"; as: string } & ({ target: string; attribute?: string } | { from: "url" | "clipboard" }))
   );
 
-export interface Script {
+export const TRANSITIONS = ["fade", "slide"] as const;
+export type Transition = (typeof TRANSITIONS)[number];
+
+export const FRAMES = ["browser-safari", "browser-chrome", "mobile-iphone", "none"] as const;
+export type FrameKind = (typeof FRAMES)[number];
+
+export interface ScreenOptions {
   url: string;
+  frame?: FrameKind;
+  /** Browser frames and `none` only; phone frames use the device's screen size. */
+  viewport?: Size;
+}
+
+export interface Script {
+  /** The page to record when the script has no `screens`. */
+  url?: string;
+  /** Named screens, each its own isolated browser page. The first one is on camera at the start. */
+  screens?: Record<string, ScreenOptions>;
   viewport?: Size;
   deviceScaleFactor?: number;
   output?: Partial<Size> & { path?: string; fps?: number };
@@ -62,6 +80,7 @@ export interface Frame {
 
 export interface StepLog {
   index: number;
+  screen: string;
   start: number;
   end: number;
   actionAt?: number;
@@ -71,13 +90,35 @@ export interface StepLog {
   shotBox?: Box;
 }
 
-export interface Recording {
-  stepsKey: string;
+export interface ScreenRecording {
+  frame: FrameKind;
   viewport: Size;
-  duration: number;
+  /** Paths relative to the `frames` folder. */
   frames: Frame[];
+  /** Pointer positions. On touch screens it jumps from tap to tap. */
   cursor: Sample[];
   clicks: number[];
-  steps: StepLog[];
   urls: { t: number; url: string }[];
+}
+
+/** A change from one screen to another: the transition runs from `start` to `end`. */
+export interface Switch {
+  /** Index of the `switch` step. */
+  step: number;
+  /** When the switch step began; the screen being left zooms out from here. */
+  leave: number;
+  start: number;
+  end: number;
+  from: string;
+  to: string;
+}
+
+export interface Recording {
+  key: string;
+  duration: number;
+  firstScreen: string;
+  screens: Record<string, ScreenRecording>;
+  switches: Switch[];
+  steps: StepLog[];
+  vars: Record<string, string>;
 }

@@ -43,18 +43,55 @@ Save it as `<name>.demo.json`. Relative paths resolve from the script's folder.
 }
 ```
 
-Actions: `goto` (url), `click`, `hover`, `type` (target, text, optional delayMs), `press` (key), `scroll` (y in px), `waitFor` (target), `pause` (ms). Every step can have a `caption`; it stays on screen until the next caption.
+Actions: `goto` (url), `click`, `hover`, `type` (target, text, optional delayMs), `press` (key), `scroll` (y in px), `waitFor` (target), `pause` (ms), `switch` (screen) and `save` (see below). Every step can have a `caption`; it stays on screen until the next caption. The caption shows first and the step waits until it can be read, so viewers read it and then watch what happens (on a `switch`, the caption shows briefly before the screen changes, and the rest of the reading time comes after).
 
 - `target` is a Playwright selector: `text=Save`, `#id`, `button:has-text("Save")`, `[data-testid=x]`.
 - `zoom` (on click, hover, type): `true` (1.8×), a number for the scale, or `{ "scale": 2, "holdMs": 600, "include": ["#list li:last-child"] }`. `include` lists other elements to keep in view with the target, usually what the action changes (a new row, a toast, a result). The camera frames all of them, measured once the step finishes, and zooms out below `scale` if they would not fit. Zoom on the steps that matter, not on every step. Close zooms are joined into one smooth pan. On a zoomed `type` step the camera follows the last typed word and stays inside the input.
 - `motionBlur`: 0 (off) to 1 (strong). It only applies while the camera or cursor moves.
 - Start with a `pause` of about 1 s so viewers see the starting state, and end with one too.
 
+### More than one screen
+
+When a feature has two sides (one person acts, another sees the result), declare `screens` instead of `url`. Each screen is its own browser page with its own cookies, so each can be signed in as a different user. All screens run for the whole recording, so changes made on one screen already show on the other when the video cuts to it.
+
+```json
+{
+  "screens": {
+    "desk":  { "url": "http://localhost:3000/orders", "frame": "browser-safari" },
+    "phone": { "url": "http://localhost:4000/", "frame": "mobile-iphone" }
+  },
+  "steps": [
+    { "action": "click", "target": "text=New order", "caption": "Create an order" },
+    { "action": "save", "as": "link", "target": "#order-link", "attribute": "href" },
+    { "action": "switch", "screen": "phone", "caption": "Open it on the phone" },
+    { "action": "goto", "url": "${link}" }
+  ]
+}
+```
+
+- The first screen is on camera at the start. `{ "action": "switch", "screen": "phone" }` moves to another screen; the steps after it run there until the next `switch`. A switch keeps a short pause before and after, so there is no need to add `pause` steps around it.
+- `transition` on a switch: `fade` (default) or `slide`. A slide moves the windows sideways: to the left when going to a screen listed later in `screens`, to the right when going back. Changing it only needs `opendemo render`.
+- `frame`: `browser-safari` (default), `browser-chrome`, `mobile-iphone` or `none`. A browser frame uses `viewport` (per screen, or the top-level one). A phone has its own screen size, so don't set `viewport` on it. Phones show taps instead of a cursor.
+- Each screen keeps its scroll and cursor position. The camera is zoomed out right after every switch.
+
+### Values found during the recording
+
+Some values only exist once the recording runs (a link, an ID the demo just created). `save` reads one and stores it under a name; any later step can use it as `${name}` in any text: URLs, typed text, targets, captions.
+
+```json
+{ "action": "save", "as": "link", "target": "#share", "attribute": "href" }
+{ "action": "save", "as": "id",   "target": ".record-id" }
+{ "action": "save", "as": "page", "from": "url" }
+{ "action": "save", "as": "copied", "from": "clipboard" }
+```
+
+That is an element's attribute (`href` comes back as a full URL), an element's text, the current page URL, or the clipboard (after a step that copies). `save` takes no time in the video. The run stops with an error if a value is used before it is saved or the element doesn't exist.
+
 ## 3. Run it
 
 ```sh
 opendemo run demo.json      # record + render, prints the MP4 path
-opendemo render demo.json   # re-render after changing only "style" or captions
+opendemo render demo.json   # re-render after changing only "style" or a caption's wording (not screens, steps or caption length)
 ```
 
 Run it in the background if it is long. The recording is kept in `<output>.opendemo/`.

@@ -1,0 +1,30 @@
+{
+  "screens": {
+    "admin": { "url": "http://localhost:4321/admin?reset", "frame": "browser-safari" },
+    "member": { "url": "http://localhost:4321/", "frame": "mobile-iphone" }
+  },
+  "output": { "path": "team.mp4", "width": 2560, "height": 1440, "fps": 60 },
+  "style": {
+    "background": "./assets/background.jpg",
+    "padding": 0.08,
+    "radius": 0.018,
+    "shadow": 0.6,
+    "motionBlur": 0.5
+  },
+  "steps": [
+    { "action": "pause", "ms": 1200, "caption": "The admin invites a teammate" },
+    { "action": "click", "target": "#invite", "zoom": { "scale": 1.6, "include": ["#invite-card"] } },
+    { "action": "save", "as": "link", "target": "#invite-link", "attribute": "href" },
+    { "action": "switch", "screen": "member", "transition": "slide", "caption": "Sam opens the invite on their phone" },
+    { "action": "goto", "url": "${link}" },
+    { "action": "type", "target": "#name", "text": "Sam Rivera", "zoom": 1.5 },
+    { "action": "click", "target": "text=Join team", "caption": "One tap to join" },
+    { "action": "waitFor", "target": "#feed" },
+    { "action": "switch", "screen": "admin", "transition": "slide", "caption": "Sam shows up for the admin right away" },
+    { "action": "pause", "ms": 800 },
+    { "action": "type", "target": "#announcement", "text": "Standup moves to 10:30 tomorrow", "zoom": 1.6, "caption": "Post an announcement" },
+    { "action": "click", "target": "#post", "zoom": { "scale": 1.6, "include": ["#posts li:first-child"] } },
+    { "action": "switch", "screen": "member", "caption": "It lands on Sam's phone, live" },
+    { "action": "pause", "ms": 2200 }
+  ]
+}

@@ -1,6 +1,6 @@
 import { center, clamp, keepInside, lerp } from "./geometry.ts";
 import type { Layout } from "./layout.ts";
-import { zoomOf } from "./script.ts";
+import { fillVars, zoomOf } from "./script.ts";
 import { itemAt } from "./timeline.ts";
 import type { Box, Point, Recording, Sample, Script, Size } from "./types.ts";
 
@@ -66,9 +66,12 @@ export function fitScale(scale: number, box: Box, layout: Layout) {
   return Math.max(1, Math.min(scale, fitsWidth, fitsHeight));
 }
 
-function buildShots(script: Script, rec: Recording, layout: Layout, navigations: readonly number[]): Shot[] {
+function buildShots(script: Script, rec: Recording, screen: string, layout: Layout, navigations: readonly number[]): Shot[] {
+  // A zoom never starts before the page it frames has loaded, or before the switch to this screen has settled.
+  const settled = rec.switches.filter((s) => s.to === screen).map((s) => rec.steps.find((l) => l.index === s.step)?.end ?? s.end);
+  const cuts = [...navigations, ...settled].sort((a, b) => a - b);
   return rec.steps.flatMap((log) => {
-    const step = script.steps[log.index];
+    const step = log.screen === screen ? script.steps[log.index] : undefined;
     const zoom = step && zoomOf(step);
     const { point, actionAt, shotBox } = log;
     if (!zoom || !point || actionAt === undefined) return [];
@@ -76,9 +79,9 @@ function buildShots(script: Script, rec: Recording, layout: Layout, navigations:
     return [{
       scale: shotBox ? fitScale(zoom.scale, shotBox, layout) : zoom.scale,
       point: shotBox ? center(shotBox) : point,
-      focus: log.caret && step.action === "type" ? wordFocus(log.caret, step.text) : undefined,
+      focus: log.caret && step.action === "type" ? wordFocus(log.caret, fillVars(step.text, rec.vars)) : undefined,
       bounds: log.inputBox,
-      on: actionAt - LEAD_MS,
+      on: Math.max(actionAt - LEAD_MS, cuts.findLast((t) => t <= actionAt) ?? -Infinity),
       start: log.start,
       actionAt,
       off: Math.min(log.end + zoom.holdMs, nextNavigation),
@@ -159,17 +162,22 @@ function smoothCamera(target: (t: number) => Camera, durationMs: number): (t: nu
   };
 }
 
-export function buildCamera(script: Script, rec: Recording, layout: Layout): (t: number) => Camera {
-  const navigations = rec.urls.slice(1).map((u) => u.t);
-  const chains = chainShots(buildShots(script, rec, layout, navigations), navigations);
-  const wide = frameOn(layout, rec.viewport, 1, { x: rec.viewport.width / 2, y: rec.viewport.height / 2 });
+/**
+ * The camera of one screen. Switching screens counts as a navigation for both of them,
+ * so each screen is seen zoomed out right after a switch.
+ */
+export function buildCamera(script: Script, rec: Recording, screen: string, layout: Layout): (t: number) => Camera {
+  const { viewport, urls } = rec.screens[screen]!;
+  const navigations = [...urls.slice(1).map((u) => u.t), ...rec.switches.map((s) => s.leave)].sort((a, b) => a - b);
+  const chains = chainShots(buildShots(script, rec, screen, layout, navigations), navigations);
+  const wide = frameOn(layout, viewport, 1, { x: viewport.width / 2, y: viewport.height / 2 });
 
   const target = (t: number): Camera => {
     const chain = chains.find((c) => t >= c.on && t < c.off);
     const shot = chain?.shots.findLast((s, i) => t >= (i === 0 ? chain.on : s.start));
     if (!shot) return wide;
     const focus = (shot.focus && itemAt(shot.focus, t)) ?? shot.point;
-    return frameOn(layout, rec.viewport, shot.scale, focus, shot.focus && shot.bounds);
+    return frameOn(layout, viewport, shot.scale, focus, shot.focus && shot.bounds);
   };
   return smoothCamera(target, rec.duration);
 }
