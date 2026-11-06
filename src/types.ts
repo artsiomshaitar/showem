@@ -31,8 +31,11 @@ export type Step = StepBase &
     | ({ action: "click"; target: string } & Zoomable)
     | ({ action: "hover"; target: string } & Zoomable)
     | ({ action: "type"; target: string; text: string; delayMs?: number } & Zoomable)
+    | ({ action: "select"; target: string; option: string } & Zoomable)
+    | { action: "zoom-in"; target: string; scale?: number; keepInView?: string[] }
+    | { action: "zoom-out" }
     | { action: "press"; key: string }
-    | { action: "scroll"; y: number }
+    | ({ action: "scroll" } & ({ y: number } | { target: string }))
     | { action: "wait-for"; target: string }
     | { action: "wait"; ms: number }
     | { action: "pause-recording" }
@@ -93,6 +96,23 @@ export interface StepLog {
   caret?: Sample[];
   inputBox?: Box;
   shotBox?: Box;
+  menu?: Menu;
+}
+
+/** A native `<select>`'s menu, which the browser doesn't draw into the recording, so the render draws it. Page coordinates. */
+export interface Menu {
+  box: Box;
+  rowHeight: number;
+  fontSize: number;
+  /** The rows shown: a long list shows only the part around the chosen option. */
+  options: string[];
+  /** Drawn like iPhone Safari's menu instead of a desktop one. */
+  ios: boolean;
+  /** Rows (in `options`) checked before and after the pick, or -1 when not shown. */
+  from: number;
+  to: number;
+  openAt: number;
+  closeAt: number;
 }
 
 export interface ScreenRecording {

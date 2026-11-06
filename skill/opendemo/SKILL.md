@@ -15,13 +15,13 @@ If you can read the app's code, read how the flow works before you write any ste
 - Which values only exist while the script runs (an ID or link the flow creates). Read those with `save`. Never make them up or write them into the script.
 - Take selectors and URLs from the code. Never guess them.
 
-Make sure the app is running and has realistic data. No secrets or personal data on screen.
+Make sure the app is running and has realistic data. If it's already running, use it as it is: never stop or restart servers you didn't start. No secrets or personal data on screen.
 
 ## 2. Plan
 
 - One message per video. Decide what the viewer should remember.
 - Do what the user asked. If they don't want to see a part, it goes between `pause-recording` and `resume-recording`. If they ask for a quick video, keep it short.
-- 3 to 6 visible steps, 10 to 40 seconds. Each important step gets a caption of 8 words or fewer.
+- Keep it as short as the request allows: one scene per point the user asked to see. Each important step gets a caption of 10 words or fewer.
 
 ## 3. Write the script
 
@@ -51,7 +51,7 @@ url: http://localhost:3000
 viewport:
   width: 1440
   height: 900
-zoom: 1.8                 # the scale of `zoom: true` steps
+zoom: 1.8                 # the scale of `zoom: true` steps and `zoom-in`
 zoom-hold-ms: 300         # how long the camera stays zoomed after a step
 output:
   path: demo.mp4
@@ -101,7 +101,7 @@ steps:
 
 Each step is a list item that starts with `action:`. Its other fields go on the lines below, lined up with `action:`. All names are kebab-case. Write one field per line, not `{ ... }` on one line, and put a blank line between steps.
 
-The actions are `goto`, `click`, `hover`, `type`, `press`, `scroll`, `wait-for`, `wait`, `switch`, `save`, `pause-recording` and `resume-recording`. For the exact fields:
+The actions are `goto`, `click`, `hover`, `type`, `select`, `press`, `scroll`, `wait-for`, `wait`, `switch`, `save`, `zoom-in`, `zoom-out`, `pause-recording` and `resume-recording`. For the exact fields:
 
 ```sh
 opendemo docs           # every top-level field, how steps work, and the list of actions
@@ -113,8 +113,13 @@ Look up an action with `opendemo docs <action>` before using a field you're not 
 Every step except `pause-recording` and `resume-recording` can have a `caption`. It stays on screen until the next caption. The caption shows first and the step waits until it can be read, so viewers read it and then watch what happens.
 
 - `target` is a Playwright selector: `text=Save`, `#id`, `button:has-text("Save")`, `[data-testid=x]`. Put quotes around any selector that starts with `#`, or YAML reads it as a comment.
-- `zoom` (on click, hover, type): `true` uses the script's `zoom` scale, a number zooms to that scale. Zoom on the steps that matter, not on every step. Close zooms are joined into one smooth pan. On a zoomed `type` step the camera follows the last typed word.
+- `select` picks a dropdown option by its visible text (`option: Waiting on parts`). Use it for every dropdown, native `<select>` or one made of page elements: OpenDemo tells them apart and shows the menu in the video either way. For a native one, `target` is the `<select>`; otherwise it's the element that opens the dropdown.
+- `type` works on native date and time inputs too: write the value (`2:00 PM`, `2026-11-07`, `2026-11-07T14:00`) and OpenDemo types it into the input's parts. Don't press keys to move between the parts.
+- To show something without pointing at it, `scroll` with `target` brings it smoothly into view. Steps that point at an element already scroll to it. `y` (pixels) is for scrolling by an amount.
+- `zoom` (on click, hover, type, select): `true` uses the script's `zoom` scale, a number zooms to that scale. Zoom on the steps that matter, not on every step. Close zooms are joined into one smooth pan. On a zoomed `type` step the camera follows the last typed word.
 - `keep-in-view`: a list of other elements to keep in frame with the target while zoomed, usually what the step changes (a new row, a toast). The camera zooms out below the scale if they don't fit.
+- `zoom-in` and `zoom-out`: zoom in on an element (a form, a dialog, a menu) and stay zoomed for several steps, until `zoom-out`, a `goto` or a `switch`. The camera follows the steps inside it. `keep-in-view` works on it too: list the elements to show and the camera frames them all.
+- Choosing between them: `zoom` is for a moment, `zoom-in` is for a scene. When one step is the point and the camera can pull back after it, use `zoom` on that step: it zooms in as the pointer arrives and out on its own. When the viewer should stay close for a while (several steps in one area, a pause to read something, steps like `press` or `wait` that can't zoom), use `zoom-in` and `zoom-out` around them.
 - Start with a `wait` of about 1 s so viewers see the starting state, and end with one too.
 - Use `#` comments to say what each part of the script is for.
 
@@ -208,9 +213,13 @@ Put preparation nobody needs to watch (signing in, opening the right page, closi
 - Paused steps run at full speed. End the paused part with a `wait-for` on something the next visible step needs.
 - Paused steps can't have captions, zoom or transitions (except that last `switch`), since they're never shown.
 
-## 4. Check, then run
+## 4. Check, try, then run
 
-Run `opendemo check -` with the script. It lists every problem at once, each with the line, the step and how to fix it. Fix them all (use `opendemo docs <action>` when a step's fields are wrong) and check again until it prints `OK`. Only then record:
+Run `opendemo check -` with the script. It lists every problem at once, each with the line, the step and how to fix it. Fix them all (use `opendemo docs <action>` when a step's fields are wrong) and check again until it prints `OK`.
+
+Then run `opendemo try -` with the script and the same `--out` you'll record with. It runs the steps in the browser at full speed, without recording or rendering and skipping `wait` steps, so it takes seconds. A `wait` is only for viewers: to wait for the app, use `wait-for`. It stops at the first step that fails, with its line and the error, and saves a screenshot of each screen where it stopped (or at the end). Look at the screenshots, fix the script, and try again until it prints `OK`. Use it instead of writing your own browser scripts to test selectors. The steps really run, so anything they change in the app stays changed: put the app's data back before recording if the flow needs it.
+
+Only then record:
 
 ```sh
 opendemo run - --out /tmp/demos/invite-flow.mp4 <<'EOF'
@@ -232,4 +241,4 @@ Extract a few frames and look at them:
 ffmpeg -v error -i /tmp/demos/invite-flow.mp4 -vf "fps=1/2,scale=640:-1,tile=3x2" -frames:v 1 /tmp/demos/contact.jpg
 ```
 
-Check that every step happened, zooms land on the right element, and captions are readable. If a step failed (the run errors with the selector), fix the selector and run again.
+Check that every step happened, zooms land on the right element, and captions are readable. If a step failed, fix it with `opendemo try` and run again.

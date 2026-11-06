@@ -189,6 +189,15 @@ describe("visual options on steps that aren't recorded", () => {
     expect(checkScript(script)).toEqual([{ step: 2, message: "this step runs while recording is paused, so its `caption` and `zoom` are never shown. Remove them" }]);
   });
 
+  test("keep-in-view on a zoom-in needs no zoom field", () => {
+    expect(checkScript(makeScript({ steps: [{ action: "zoom-in", target: "#a", keepInView: ["#b"] }] }))).toEqual([]);
+  });
+
+  test("a zoom-in or zoom-out while paused is never shown", () => {
+    const steps: Step[] = [shown, { action: "pause-recording" }, { action: "zoom-in", target: "#a" }, { action: "zoom-out" }, { action: "resume-recording" }];
+    expect(checkScript(makeScript({ screens, steps })).map((p) => p.step)).toEqual([2, 3]);
+  });
+
   test("a switch that ends on the screen it started from shows nothing", () => {
     const steps: Step[] = [shown, { action: "pause-recording" }, { action: "switch", screen: "one", transition: "slide" }, { action: "resume-recording" }];
     expect(checkScript(makeScript({ screens, steps }))).toEqual([{ step: 2, message: expect.stringContaining("its `transition` is never shown") }]);

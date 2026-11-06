@@ -45,6 +45,11 @@ describe("chainShots", () => {
     expect(chainShots([shot(0, 1000), shot(5000, 6000)], [])).toHaveLength(2);
   });
 
+  test("joins shots split only by a caption being read before the next step acts", () => {
+    const next: Shot = { ...shot(3000, 5000, 3900), start: 1500 };
+    expect(chainShots([shot(0, 1000), next], [])).toHaveLength(1);
+  });
+
   test("splits shots across a page navigation", () => {
     expect(chainShots([shot(0, 1000), shot(1500, 2500)], [1200])).toHaveLength(2);
   });
@@ -113,10 +118,60 @@ describe("buildCamera", () => {
     expect(buildCamera(script, loaded, "main", l)(1200).scale).toBeLessThan(1.05);
   });
 
+  test("stays zoomed while the keys pressed after the step go into what it focused", () => {
+    const pressed = makeScript({ steps: [...steps, { action: "press", key: "2" }, { action: "press", key: "P" }] });
+    const keys = [{ index: 1, screen: "main", start: 2000, end: 3000 }, { index: 2, screen: "main", start: 3000, end: 4000 }];
+    expect(buildCamera(pressed, makeRecording(pressed, { steps: [log, ...keys], duration: 6000 }), "main", l)(3900).scale).toBeGreaterThan(1.9);
+  });
+
   test("moves smoothly, without jumps between samples", () => {
     const camera = buildCamera(script, makeRecording(script, { steps: [log] }), "main", l);
     for (let t = 0; t < 4000; t += 1000 / 60) {
       expect(Math.abs(camera(t + 1000 / 60).scale - camera(t).scale)).toBeLessThan(0.1);
     }
+  });
+});
+
+describe("zoom-in", () => {
+  const steps: Step[] = [
+    { action: "zoom-in", target: "#form", scale: 2 },
+    { action: "click", target: "#inside" },
+    { action: "click", target: "#outside" },
+    { action: "zoom-out" },
+  ];
+  const script = makeScript({ steps });
+  const form = { x: 600, y: 350, width: 240, height: 200 };
+  const logs = [
+    { index: 0, screen: "main", start: 500, actionAt: 500, end: 1300, point: { x: 720, y: 450 }, shotBox: form },
+    { index: 1, screen: "main", start: 1300, actionAt: 2000, end: 3000, point: { x: 700, y: 400 } },
+    { index: 2, screen: "main", start: 3000, actionAt: 3700, end: 4500, point: { x: 100, y: 850 } },
+    { index: 3, screen: "main", start: 6000, actionAt: 6000, end: 6300 },
+  ];
+  const camera = buildCamera(script, makeRecording(script, { steps: logs, duration: 9000 }), "main", l);
+
+  test("stays zoomed on the element through the steps after it, however long, until zoom-out", () => {
+    expect(camera(400).scale).toBeLessThan(1.05);
+    expect(camera(1500).scale).toBeGreaterThan(1.9);
+    expect(camera(5900).scale).toBeGreaterThan(1.9);
+    expect(camera(8500).scale).toBeLessThan(1.05);
+  });
+
+  test("stays put for a step it already shows, and follows one it doesn't", () => {
+    const formCenter = frameOn(l, VIEWPORT, 2, { x: 720, y: 450 });
+    expect(camera(2900).cx).toBeCloseTo(formCenter.cx, 2);
+    expect(camera(4500).cx).toBeLessThan(formCenter.cx - 0.05);
+  });
+
+  test("goes back to the zoom-in's frame when a zoomed step inside it is done", () => {
+    const zoomed = makeScript({ steps: [steps[0]!, { action: "click", target: "#inside", zoom: 3 }, { action: "wait", ms: 3000 }, { action: "zoom-out" }] });
+    const zoomedLogs = [logs[0]!, { ...logs[1]!, point: { x: 650, y: 380 } }, { index: 2, screen: "main", start: 3000, end: 6000 }, logs[3]!];
+    const cam = buildCamera(zoomed, makeRecording(zoomed, { steps: zoomedLogs, duration: 9000 }), "main", l);
+    expect(cam(2500).scale).toBeGreaterThan(2.9);
+    expect(cam(5500).scale).toBeCloseTo(2, 1);
+  });
+
+  test("ends at a page change", () => {
+    const navigated = buildCamera(script, makeRecording(script, { steps: logs, duration: 9000 }, { urls: [{ t: 0, url: "a" }, { t: 2500, url: "b" }] }), "main", l);
+    expect(navigated(3500).scale).toBeLessThan(1.2);
   });
 });

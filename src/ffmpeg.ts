@@ -12,7 +12,7 @@ export function startEncoder(outPath: string, size: Size, fps: number) {
     [
       "ffmpeg", "-y", "-loglevel", "error",
       "-f", "rawvideo", "-pix_fmt", "rgba", "-s", `${size.width}x${size.height}`, "-r", String(fps), "-i", "-",
-      "-c:v", "libx264", "-preset", "slow", "-crf", "16", "-pix_fmt", "yuv420p",
+      "-c:v", "libx264", "-preset", "veryfast", "-crf", "16", "-pix_fmt", "yuv420p",
       outPath,
     ],
     { stdin: "pipe", stdout: "inherit", stderr: "inherit" },

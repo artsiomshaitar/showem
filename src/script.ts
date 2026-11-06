@@ -10,7 +10,7 @@ export const DEFAULT_FRAME: FrameKind = "browser-safari";
 const SINGLE_SCREEN = "main";
 const VAR = /\$\{(\w+)\}/g;
 /** Step options that only change how the video looks, not what the browser does. */
-const VISUAL_OPTIONS = ["caption", "zoom", "transition"] as const;
+const VISUAL_OPTIONS = ["caption", "zoom", "scale", "transition"] as const;
 
 export interface Screen {
   url: string;
@@ -69,7 +69,7 @@ export function checkScript(script: Script): Problem[] {
     // `screen` is missing on a step that failed its field check; that step already has its own error.
     if (step.action === "switch" && script.screens && step.screen !== undefined && !screens.includes(step.screen)) add(`there is no screen "${step.screen}". ${didYouMean(step.screen, screens)}`);
     if (step.action === "switch" && !script.screens) add("`switch` needs `screens` at the top of the script");
-    if ("keepInView" in step && step.keepInView && !step.zoom) add("`keep-in-view` only works with `zoom`. Add `zoom: true`, or remove it");
+    if ("keepInView" in step && step.keepInView && step.action !== "zoom-in" && !step.zoom) add("`keep-in-view` only works with `zoom`. Add `zoom: true`, or remove it");
     for (const [, name] of JSON.stringify(step).matchAll(VAR)) {
       if (name && !saved.has(name)) add(`"\${${name}}" is used before it's saved. Add a \`save\` step with \`as: ${name}\` before this step`);
     }
@@ -79,6 +79,11 @@ export function checkScript(script: Script): Problem[] {
     problems.push({ step: pausedAt, message: "pause-recording is never resumed. Add `- action: resume-recording` where the video should continue" });
   } else {
     for (const i of hiddenSteps(script)) {
+      const { action } = script.steps[i]!;
+      if (action === "zoom-in" || action === "zoom-out") {
+        problems.push({ step: i, message: `this step runs while recording is paused, so the ${action} is never shown. Remove it` });
+        continue;
+      }
       const options = VISUAL_OPTIONS.filter((key) => (script.steps[i] as unknown as Record<string, unknown>)[key] !== undefined);
       if (!options.length) continue;
       const fields = options.map((key) => `\`${key}\``).join(" and ");

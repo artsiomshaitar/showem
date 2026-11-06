@@ -43,10 +43,16 @@ export const ACTIONS: Record<Step["action"], ActionSpec> = {
     example: "- action: hover\n  target: \"#help\"\n  caption: Tips are one hover away",
   },
   type: {
-    doc: "Click an input and type into it, one key at a time.",
-    fields: { target, text: text("What to type."), "delay-ms": num("Pause between keys. Default: 60.", { min: 0 }), zoom, "keep-in-view": keepInView },
+    doc: "Click an input and type into it, one key at a time. On a native date or time input it types the value into the input's parts (day, hour, AM/PM) the way a person would.",
+    fields: { target, text: text("What to type. For a native date or time input, the value: `14:00` or `2:00 PM`, `2026-11-07`, `2026-11-07T14:00`."), "delay-ms": num("Pause between keys. Default: 60.", { min: 0 }), zoom, "keep-in-view": keepInView },
     required: ["target", "text"],
     example: "- action: type\n  target: \"#name\"\n  text: Launch plan\n  zoom: 1.6\n  caption: Name the project",
+  },
+  select: {
+    doc: "Pick an option from a dropdown. On a native `<select>` the pointer opens a menu drawn in the video (the browser doesn't film its own) and clicks the option. On a dropdown made of page elements it clicks the target, then the option.",
+    fields: { target: text("The `<select>`, or the element that opens the dropdown, as a Playwright selector."), option: text("The option's visible text, exactly as shown."), zoom, "keep-in-view": keepInView },
+    required: ["target", "option"],
+    example: "- action: select\n  target: \"#reason\"\n  option: Waiting on parts\n  zoom: true\n  caption: Pick the reason",
   },
   press: {
     doc: "Press a key or a key combination.",
@@ -55,10 +61,12 @@ export const ACTIONS: Record<Step["action"], ActionSpec> = {
     example: "- action: press\n  key: Enter",
   },
   scroll: {
-    doc: "Scroll the page with the mouse wheel.",
-    fields: { y: num("Pixels to scroll: positive goes down, negative goes up.") },
-    required: ["y"],
-    example: "- action: scroll\n  y: 400\n  caption: Everything in one place",
+    doc: "Scroll the page: smoothly until an element is in view, centered if it had to move (`target`), or by a number of pixels with the mouse wheel (`y`). Steps that point at an element already scroll to it, so use this to show something without pointing at it.",
+    fields: {
+      target: text("The element to bring into view, as a Playwright selector. Use this or `y`."),
+      y: num("Pixels to scroll with the mouse wheel: positive goes down, negative goes up. Use this or `target`."),
+    },
+    example: "- action: scroll\n  target: text=Updates\n  caption: Every change is listed",
   },
   "wait-for": {
     doc: "Wait until an element is visible. Use it after anything that loads.",
@@ -92,6 +100,20 @@ export const ACTIONS: Record<Step["action"], ActionSpec> = {
     required: ["as"],
     example: "- action: save\n  as: link\n  target: \"#share-link\"\n  attribute: href\n\n- action: goto\n  url: ${link}",
   },
+  "zoom-in": {
+    doc: "Zoom the camera in on an element (a form, a dialog, a menu, a table row) and stay zoomed for the steps after it, until `zoom-out`, a `goto` or a `switch`. The camera follows the steps inside it. It waits a moment so the camera gets there before the next step.",
+    fields: {
+      target: text("The element to zoom in on, as a Playwright selector."),
+      scale: num("Default: the script's `zoom` scale.", { min: 1 }),
+      "keep-in-view": list(target, "Other elements to keep in frame with the target, measured when the zoom starts. The camera centers on all of them and zooms out below the scale if they don't fit."),
+    },
+    required: ["target"],
+    example: "- action: zoom-in\n  target: \"#name\"\n  keep-in-view:\n    - text=Save\n  caption: Fill in the details\n\n- action: type\n  target: \"#name\"\n  text: Launch plan\n\n- action: click\n  target: text=Save\n\n- action: zoom-out",
+  },
+  "zoom-out": {
+    doc: "Zoom the camera back out to the whole page after `zoom-in`.",
+    example: "- action: zoom-out",
+  },
   "pause-recording": {
     doc: "Stop recording, like the pause button on a screen recorder. The steps after it still run, at full speed, but aren't in the video. Use it for setup the viewer doesn't need to see. They can't have captions or zoom.",
     example: "- action: pause-recording\n\n- action: click\n  target: text=Dismiss\n\n- action: resume-recording",
@@ -122,7 +144,7 @@ export const TOP = object({
   },
   viewport: size("The page size in CSS pixels. Default: 1440 x 900."),
   "device-scale-factor": num("Pixel density of the recording. Default: 3.", { min: 1 }),
-  zoom: num("The scale of `zoom: true` steps. Default: 1.8.", { min: 1 }),
+  zoom: num("The scale of `zoom: true` steps and `zoom-in`. Default: 1.8.", { min: 1 }),
   "zoom-hold-ms": num("How long the camera stays zoomed after a step ends. Default: 300.", { min: 0 }),
   output: object(
     {
@@ -166,6 +188,7 @@ function readStep(raw: unknown, path: Path, issues: Issue[]): Step | undefined {
   }
   const step = check(fieldsOf(name, spec), raw, path, issues, `"${name}"`) as Step;
   if (step.action === "save" && ("target" in step) === ("from" in step)) issues.push({ path, message: `save needs either "target" (an element) or "from" (url or clipboard)` });
+  if (step.action === "scroll" && ("target" in step) === ("y" in step)) issues.push({ path, message: `scroll needs either "target" (an element to bring into view) or "y" (pixels)` });
   if (step.action === "save" && "from" in step && "attribute" in step) issues.push({ path, message: `"attribute" only works with "target"` });
   return step;
 }
@@ -222,30 +245,34 @@ function quoteHint(node: Node | undefined): string {
   return "";
 }
 
-/** Reads a YAML or JSON script and checks it. Problems come as `name:line step N (action): message` lines. */
-export function parseScript(source: string, name: string): { script: Script; problems: string[] } {
+/** Reads a YAML or JSON script and checks it. Problems come as `name:line step N (action): message` lines. `stepAt` names a step the same way. */
+export function parseScript(source: string, name: string): { script: Script; problems: string[]; stepAt: (index: number) => string } {
   const lines = new LineCounter();
   const doc = parseDocument(source, { lineCounter: lines, prettyErrors: false });
   const lineAt = (offset: number) => lines.linePos(offset).line;
   if (doc.errors.length) {
     const error = doc.errors[0]!;
     const line = lineAt(error.pos[0]);
-    return { script: { steps: [] }, problems: [`${name}:${line}: ${error.message}${parseHint(source, line)}`, count(1)] };
+    return { script: { steps: [] }, problems: [`${name}:${line}: ${error.message}${parseHint(source, line)}`, count(1)], stepAt: () => name };
   }
   const raw: unknown = doc.toJS();
   const { script, issues } = readScript(raw);
   const steps = isObject(raw) && Array.isArray(raw.steps) ? raw.steps : [];
+  const where = (line: number, index: number | undefined) => `${name}${line ? `:${line}` : ""}${index === undefined ? "" : ` step ${index + 1}${stepName(steps[index])}`}`;
   const problems = issues
     .map((issue) => {
       const { offset, node } = locate(doc.contents, issue.path);
       const line = offset === undefined ? 0 : lineAt(offset);
       const index = issue.path[0] === "steps" && typeof issue.path[1] === "number" ? issue.path[1] : undefined;
-      const step = index === undefined ? "" : ` step ${index + 1}${stepName(steps[index])}`;
-      return { line, text: `${name}${line ? `:${line}` : ""}${step}: ${issue.message}${issue.notText ? quoteHint(node) : ""}` };
+      return { line, text: `${where(line, index)}: ${issue.message}${issue.notText ? quoteHint(node) : ""}` };
     })
     .sort((a, b) => a.line - b.line)
     .map((p) => p.text);
-  return { script, problems: problems.length ? [...problems, count(problems.length)] : [] };
+  const stepAt = (index: number) => {
+    const { offset } = locate(doc.contents, ["steps", index]);
+    return where(offset === undefined ? 0 : lineAt(offset), index);
+  };
+  return { script, problems: problems.length ? [...problems, count(problems.length)] : [], stepAt };
 }
 
 /** Most broken YAML in a script is a value that needs quotes, or step fields indented more than `action:`. */
@@ -268,9 +295,9 @@ export async function loadScript(arg: string) {
   const stdin = arg === "-";
   const path = stdin ? join(process.cwd(), "opendemo.yaml") : resolve(arg);
   const source = stdin ? await Bun.stdin.text() : await Bun.file(path).text();
-  const { script, problems } = parseScript(source, stdin ? "<stdin>" : arg);
+  const { script, problems, stepAt } = parseScript(source, stdin ? "<stdin>" : arg);
   if (problems.length) return { problems };
-  return { problems, ...resolveScript(script, path) };
+  return { problems, stepAt, ...resolveScript(script, path) };
 }
 
 /** JSON Schema for the script format, for editor autocomplete and inline errors. */

@@ -72,10 +72,16 @@ steps:
 
   test("JSON is read the same way", () => {
     const json = JSON.stringify({ url: "http://x", steps: [{ action: "click", target: "#a" }, { action: "wait", ms: 5, caption: "Hi" }] });
-    expect(parseScript(json, "demo.json")).toEqual({
+    const { script, problems } = parseScript(json, "demo.json");
+    expect({ script, problems }).toEqual({
       script: { url: "http://x", steps: [{ action: "click", target: "#a" }, { action: "wait", ms: 5, caption: "Hi" }] },
       problems: [],
     });
+  });
+
+  test("names a step by its line, like a problem", () => {
+    const { stepAt } = parseScript("url: http://x\nsteps:\n  - action: wait\n    ms: 1\n\n  - action: click\n    target: \"#a\"\n", "demo.yaml");
+    expect(stepAt(1)).toBe("demo.yaml:6 step 2 (click)");
   });
 
   test("the examples are valid", async () => {
@@ -123,9 +129,15 @@ steps:
     ]);
   });
 
+  test("scroll needs either a target or y", () => {
+    expect(problems(`url: x\nsteps:\n  - action: scroll\n`)[0]).toContain(`scroll needs either "target"`);
+    expect(problems(`url: x\nsteps:\n  - action: scroll\n    y: 10\n    target: "#a"\n`)[0]).toContain(`scroll needs either "target"`);
+    expect(problems(`url: x\nsteps:\n  - action: scroll\n    target: "#a"\n`)).toEqual([]);
+  });
+
   test("catch steps without action, missing fields and options that don't belong", () => {
     expect(problems(`url: x\nsteps:\n  - click: "#a"\n  - action: type\n    target: "#a"\n  - pause-recording\n  - action: wait\n    ms: 1\n  - action: resume-recording\n    caption: x\n`)).toEqual([
-      'demo.yaml:3 step 1 (click): the step is missing "action". Use one of: goto, click, hover, type, press, scroll, wait-for, wait, switch, save, pause-recording, resume-recording',
+      'demo.yaml:3 step 1 (click): the step is missing "action". Use one of: goto, click, hover, type, select, press, scroll, wait-for, wait, switch, save, zoom-in, zoom-out, pause-recording, resume-recording',
       'demo.yaml:4 step 2 (type): "type" is missing "text"',
       'demo.yaml:6 step 3 (pause-recording): a step must be fields starting with `- action: ...`, not "pause-recording"',
       'demo.yaml:10 step 5 (resume-recording): "resume-recording" takes no other fields. Remove "caption"',

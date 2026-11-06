@@ -87,7 +87,7 @@
     "zoom": {
       "type": "number",
       "minimum": 1,
-      "description": "The scale of `zoom: true` steps. Default: 1.8."
+      "description": "The scale of `zoom: true` steps and `zoom-in`. Default: 1.8."
     },
     "zoom-hold-ms": {
       "type": "number",
@@ -316,7 +316,7 @@
               },
               "text": {
                 "type": "string",
-                "description": "What to type."
+                "description": "What to type. For a native date or time input, the value: `14:00` or `2:00 PM`, `2026-11-07`, `2026-11-07T14:00`."
               },
               "delay-ms": {
                 "type": "number",
@@ -354,7 +354,57 @@
               "text"
             ],
             "additionalProperties": false,
-            "description": "Click an input and type into it, one key at a time."
+            "description": "Click an input and type into it, one key at a time. On a native date or time input it types the value into the input's parts (day, hour, AM/PM) the way a person would."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "select"
+                ]
+              },
+              "target": {
+                "type": "string",
+                "description": "The `<select>`, or the element that opens the dropdown, as a Playwright selector."
+              },
+              "option": {
+                "type": "string",
+                "description": "The option's visible text, exactly as shown."
+              },
+              "zoom": {
+                "anyOf": [
+                  {
+                    "const": true
+                  },
+                  {
+                    "type": "number",
+                    "minimum": 1
+                  }
+                ],
+                "description": "Zoom in on the target: `true` uses the script's `zoom` scale, a number zooms to that scale."
+              },
+              "keep-in-view": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "The element, as a Playwright selector: `text=Save`, `#id`, `button:has-text(\"Save\")`, `[data-testid=x]`. Quote selectors that start with #."
+                },
+                "description": "Other elements to keep in frame with the target while zoomed, usually what the step changes (a new row, a toast). Needs `zoom`."
+              },
+              "caption": {
+                "type": "string",
+                "description": "Text shown before the step runs, until the next caption. The step waits until it can be read."
+              }
+            },
+            "required": [
+              "action",
+              "target",
+              "option"
+            ],
+            "additionalProperties": false,
+            "description": "Pick an option from a dropdown. On a native `<select>` the pointer opens a menu drawn in the video (the browser doesn't film its own) and clicks the option. On a dropdown made of page elements it clicks the target, then the option."
           },
           {
             "type": "object",
@@ -390,9 +440,13 @@
                   "scroll"
                 ]
               },
+              "target": {
+                "type": "string",
+                "description": "The element to bring into view, as a Playwright selector. Use this or `y`."
+              },
               "y": {
                 "type": "number",
-                "description": "Pixels to scroll: positive goes down, negative goes up."
+                "description": "Pixels to scroll with the mouse wheel: positive goes down, negative goes up. Use this or `target`."
               },
               "caption": {
                 "type": "string",
@@ -400,11 +454,10 @@
               }
             },
             "required": [
-              "action",
-              "y"
+              "action"
             ],
             "additionalProperties": false,
-            "description": "Scroll the page with the mouse wheel."
+            "description": "Scroll the page: smoothly until an element is in view, centered if it had to move (`target`), or by a number of pixels with the mouse wheel (`y`). Steps that point at an element already scroll to it, so use this to show something without pointing at it."
           },
           {
             "type": "object",
@@ -531,6 +584,60 @@
             ],
             "additionalProperties": false,
             "description": "Store a value that only exists while the script runs (a link, an ID it just created). Later steps use it as `${name}` in any text. Takes no time in the video."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "zoom-in"
+                ]
+              },
+              "target": {
+                "type": "string",
+                "description": "The element to zoom in on, as a Playwright selector."
+              },
+              "scale": {
+                "type": "number",
+                "minimum": 1,
+                "description": "Default: the script's `zoom` scale."
+              },
+              "keep-in-view": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "The element, as a Playwright selector: `text=Save`, `#id`, `button:has-text(\"Save\")`, `[data-testid=x]`. Quote selectors that start with #."
+                },
+                "description": "Other elements to keep in frame with the target, measured when the zoom starts. The camera centers on all of them and zooms out below the scale if they don't fit."
+              },
+              "caption": {
+                "type": "string",
+                "description": "Text shown before the step runs, until the next caption. The step waits until it can be read."
+              }
+            },
+            "required": [
+              "action",
+              "target"
+            ],
+            "additionalProperties": false,
+            "description": "Zoom the camera in on an element (a form, a dialog, a menu, a table row) and stay zoomed for the steps after it, until `zoom-out`, a `goto` or a `switch`. The camera follows the steps inside it. It waits a moment so the camera gets there before the next step."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "zoom-out"
+                ]
+              }
+            },
+            "required": [
+              "action"
+            ],
+            "additionalProperties": false,
+            "description": "Zoom the camera back out to the whole page after `zoom-in`."
           },
           {
             "type": "object",

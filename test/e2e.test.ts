@@ -17,7 +17,7 @@ beforeAll(async () => {
   await Bun.write(join(dir, "start.html"), `<a href="./form.html">Next</a>`);
   await Bun.write(
     join(dir, "form.html"),
-    `<input id="name" style="margin:40px"><button id="save" onclick="document.body.append(Object.assign(document.createElement('p'),{id:'done',textContent:'Saved'}))">Save</button>`,
+    `<input id="name" style="margin:40px"><button id="save" onclick="document.body.append(Object.assign(document.createElement('p'),{id:'done',textContent:'Saved'}))">Save</button><div style="height:1200px"></div><button id="below">Below</button><div style="height:600px"></div>`,
   );
   const scriptPath = join(dir, "flow.demo.json");
   ({ script, outPath } = resolveScript(
@@ -33,6 +33,7 @@ beforeAll(async () => {
         { action: "type", target: "#name", text: "Ada", delayMs: 10, zoom: 2, caption: "Type a name" },
         { action: "click", target: "#save", zoom: true, keepInView: ["#done"] },
         { action: "wait-for", target: "#done" },
+        { action: "hover", target: "#below" },
         { action: "pause-recording" },
         { action: "type", target: "#name", text: " Lovelace" },
         { action: "wait", ms: 1500 },
@@ -48,11 +49,18 @@ beforeAll(async () => {
 afterAll(() => rm(dir, { recursive: true, force: true }));
 
 test("records every step, including a relative goto", () => {
-  expect(rec.steps).toHaveLength(11);
+  expect(rec.steps).toHaveLength(12);
   expect(rec.screens.main?.urls.map((u) => u.url.split("/").pop())).toEqual(["start.html", "form.html"]);
   expect(rec.steps[3]?.caret?.length).toBe(4);
   expect(rec.steps[4]?.shotBox).toBeDefined();
   expect(rec.screens.main?.frames.length).toBeGreaterThan(0);
+});
+
+test("scrolls smoothly to a target below the fold, and stops with it in the middle", () => {
+  const { start, actionAt, point } = rec.steps[6]!;
+  expect(point!.y).toBeCloseTo(200, -1);
+  const during = rec.screens.main!.frames.filter((f) => f.t > start && f.t < actionAt!);
+  expect(during.length).toBeGreaterThan(5);
 });
 
 test("leaves paused steps out of the recording", () => {
@@ -61,7 +69,7 @@ test("leaves paused steps out of the recording", () => {
   expect(main.urls[1]?.t).toBe(0);
   // Paused and resumed on the same screen: the video just carries on.
   expect(rec.switches).toEqual([]);
-  const [pause, typed, wait, resume] = rec.steps.slice(6, 10);
+  const [pause, typed, wait, resume] = rec.steps.slice(7, 11);
   expect(typed?.start).toBe(pause!.end);
   expect(wait?.end).toBe(typed!.start);
   expect(resume!.end - pause!.start).toBeLessThan(300);

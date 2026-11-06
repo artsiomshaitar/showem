@@ -2,13 +2,19 @@ import { basename } from "node:path";
 import { createCanvas, loadImage, Path2D, type Canvas, type Image, type SKRSContext2D } from "@napi-rs/canvas";
 import type { Layout } from "./layout.ts";
 import type { Caption } from "./plan.ts";
-import type { Box, Point, Size } from "./types.ts";
+import { clamp } from "./geometry.ts";
+import { easeInOutCubic } from "./motion.ts";
+import { rowAt, rowBox } from "./menu.ts";
+import type { Box, Menu, Point, Size } from "./types.ts";
 
 const CURSOR = new Path2D("M0 0 L0 17 L4.2 13.2 L7 19.6 L9.8 18.4 L7.1 12.2 L12.6 12.2 Z");
 const CURSOR_PATH_HEIGHT = 20;
 const CURSOR_HEIGHT = 24;
 const TAP_RADIUS = 20;
 export const CAPTION_FADE_MS = 180;
+const MENU_FADE_IN_MS = 120;
+const MENU_FADE_OUT_MS = 100;
+const IOS_MENU_GROW_MS = 200;
 const UI_FONT = `"SF Pro Text", "Helvetica Neue", Arial, sans-serif`;
 const CAPTION_FONT = `"SF Pro Display", "Helvetica Neue", Arial, sans-serif`;
 
@@ -285,6 +291,76 @@ function drawSafariToolbar(ctx: SKRSContext2D, layout: Layout, url: string) {
   }
   ctx.fillStyle = "#3c3c43";
   ctx.fillText(label, x, mid);
+}
+
+/**
+ * A native select's open menu, in page coordinates: like the one Chrome shows on macOS, or on a phone (`menu.ios`) like
+ * iPhone Safari's, which grows out of the select as it opens. The row under `pointer` is highlighted, and the check mark
+ * moves to the chosen row once the menu starts to close.
+ */
+export function drawMenu(ctx: SKRSContext2D, menu: Menu, t: number, pointer: Point) {
+  const alpha = clamp(Math.min((t - menu.openAt) / MENU_FADE_IN_MS, (menu.closeAt - t) / MENU_FADE_OUT_MS), 0, 1);
+  if (alpha <= 0) return;
+  const { box, fontSize, ios } = menu;
+  const checked = t >= menu.closeAt - MENU_FADE_OUT_MS ? menu.to : menu.from;
+  const hovered = rowAt(menu, pointer);
+  ctx.save();
+  ctx.globalAlpha *= alpha;
+  if (ios) {
+    const grow = 0.9 + 0.1 * easeInOutCubic(clamp((t - menu.openAt) / IOS_MENU_GROW_MS, 0, 1));
+    ctx.translate(box.x, box.y);
+    ctx.scale(grow, grow);
+    ctx.translate(-box.x, -box.y);
+  }
+  ctx.shadowColor = ios ? "rgba(0,0,0,0.2)" : "rgba(0,0,0,0.22)";
+  ctx.shadowBlur = ios ? 30 : 16;
+  ctx.shadowOffsetY = ios ? 10 : 6;
+  ctx.fillStyle = ios ? "#f9f9f9" : "#fff";
+  roundedBox(ctx, box, ios ? 13 : 7);
+  ctx.fill();
+  ctx.shadowColor = "transparent";
+  if (!ios) {
+    ctx.lineWidth = 0.5;
+    ctx.strokeStyle = "rgba(0,0,0,0.18)";
+    ctx.stroke();
+  }
+  ctx.clip();
+  ctx.font = `400 ${fontSize}px ${UI_FONT}`;
+  ctx.textBaseline = "middle";
+  ctx.textAlign = "left";
+  const indent = ios ? fontSize * 2.3 : fontSize * 1.5;
+  menu.options.forEach((label, i) => {
+    const row = rowBox(menu, i);
+    const mid = row.y + row.height / 2;
+    if (ios) {
+      // Full-width rows split by hairlines, and a gray press highlight.
+      if (i > 0) {
+        ctx.fillStyle = "rgba(60,60,67,0.2)";
+        ctx.fillRect(box.x, row.y, box.width, 0.5);
+      }
+      if (i === hovered) {
+        ctx.fillStyle = "rgba(0,0,0,0.1)";
+        ctx.fillRect(box.x, row.y, box.width, row.height);
+      }
+    } else if (i === hovered) {
+      ctx.fillStyle = "#0a64d8";
+      roundedBox(ctx, row, 4);
+      ctx.fill();
+    }
+    ctx.fillStyle = ctx.strokeStyle = ios ? "#000" : i === hovered ? "#fff" : "#1d1d1f";
+    if (i === checked) {
+      const x = row.x + fontSize * (ios ? 0.6 : 0.45);
+      ctx.lineWidth = fontSize * 0.12;
+      ctx.lineCap = ctx.lineJoin = "round";
+      ctx.beginPath();
+      ctx.moveTo(x, mid);
+      ctx.lineTo(x + fontSize * 0.25, mid + fontSize * 0.25);
+      ctx.lineTo(x + fontSize * 0.65, mid - fontSize * 0.3);
+      ctx.stroke();
+    }
+    ctx.fillText(label, row.x + indent, mid);
+  });
+  ctx.restore();
 }
 
 /** Cursor size during a click: a quick press down, then a small overshoot back. */
