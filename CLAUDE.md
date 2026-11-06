@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-OpenDemo turns a JSON step script into a demo video: it runs the script in headless Chromium, then draws zooms, cursor, captions and device frames on top. Bun + TypeScript, no build step.
+OpenDemo turns a YAML (or JSON) step script into a demo video: it runs the script in headless Chromium, then draws zooms, cursor, captions and device frames on top. Bun + TypeScript, no build step.
 
 ## Commands
 
@@ -10,8 +10,9 @@ OpenDemo turns a JSON step script into a demo video: it runs the script in headl
 bun test                         # all tests (~25s, some launch Chromium and ffmpeg)
 bun test test/plan.test.ts       # one file
 bun run typecheck
-bun src/cli.ts run <script.json>     # record + render
-bun src/cli.ts render <script.json>  # re-render the last recording
+bun src/cli.ts check <script.yaml>   # check a script without running it
+bun src/cli.ts run <script.yaml>     # record + render (`-` reads the script from stdin)
+bun src/cli.ts render <script.yaml>  # re-render the last recording
 ```
 
 After every code change, run `bun test` and `bun run typecheck`, and fix anything that fails before you finish.
@@ -29,3 +30,5 @@ Main rule: `render` only accepts a recording if the script still matches it (`re
 ## Docs
 
 Update `skill/opendemo/SKILL.md` (the script format reference) with any script change. Keep it app-agnostic.
+
+The script format lives in `format.ts` (fields, actions with their docs and examples, parsing, line numbers; `opendemo docs` prints them via `docs.ts`) and `script.ts` (`checkScript`, checks that need the whole script). After changing it, run `bun src/cli.ts schema > opendemo.schema.json`.

@@ -5,7 +5,7 @@ import { caretOf, MIRRORED_STYLES } from "./caret.ts";
 import { TAP_LEAD_MS } from "./device.ts";
 import { center, union } from "./geometry.ts";
 import { cursorPath, TRANSITION_MS, travelMs } from "./motion.ts";
-import { fillStep, ignoredOptionsWarning, isPhone, NOTICE_MS, pausesOf, readingMs, recordingKey, screensOf, styleOf, zoomOf, type Pause } from "./script.ts";
+import { fillStep, isPhone, NOTICE_MS, pausesOf, readingMs, recordingKey, screensOf, styleOf, type Pause } from "./script.ts";
 import type { Box, Frame, Point, Recording, Sample, Script, ScreenRecording, Step, StepLog, Switch } from "./types.ts";
 
 const DEFAULT_SCALE_FACTOR = 3;
@@ -190,13 +190,13 @@ class Director {
     return value;
   }
 
-  /** The area the camera should frame: the target plus the elements listed in `zoom.include`. */
-  async shotBox(target: string, include: readonly string[]): Promise<Box | undefined> {
+  /** The area the camera should frame: the target plus the elements listed in `keep-in-view`. */
+  async shotBox(target: string, keepInView: readonly string[]): Promise<Box | undefined> {
     const boxes: Box[] = [];
-    for (const selector of [target, ...include]) {
+    for (const selector of [target, ...keepInView]) {
       const box = await this.page.locator(selector).first().boundingBox({ timeout: 1000 }).catch(() => null);
       if (box) boxes.push(box);
-      else console.error(`zoom.include: nothing visible matches ${selector}`);
+      else console.error(`keep-in-view: nothing visible matches ${selector}`);
     }
     return union(boxes);
   }
@@ -258,8 +258,6 @@ class Director {
 }
 
 export async function record(script: Script, dir: string): Promise<Recording> {
-  const warning = ignoredOptionsWarning(script);
-  if (warning) console.error(warning);
   const framesDir = join(dir, "frames");
   await rm(framesDir, { recursive: true, force: true });
 
@@ -401,8 +399,7 @@ export async function record(script: Script, dir: string): Promise<Recording> {
         } else {
           await director.run(step, log);
           if (step.action !== "wait" && step.action !== "wait-for") await Bun.sleep(step.caption ? CAPTION_HOLD_MS : SETTLE_MS);
-          const include = zoomOf(step)?.include ?? [];
-          if (include.length && "target" in step) log.shotBox = await director.shotBox(step.target, include);
+          if ("keepInView" in step && step.keepInView?.length) log.shotBox = await director.shotBox(step.target, step.keepInView);
         }
       }
       log.end = now();

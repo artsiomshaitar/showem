@@ -1,22 +1,20 @@
 import { describe, expect, test } from "bun:test";
-import { checkScript, DEFAULT_ZOOM, fillStep, hiddenSteps, ignoredOptionsWarning, outputOf, pausesOf, readingMs, recordingKey, resolveScript, screensOf, stepsKey, styleOf, zoomOf } from "../src/script.ts";
-import type { Step } from "../src/types.ts";
+import { checkScript, DEFAULT_ZOOM, fillStep, hiddenSteps, outputOf, pausesOf, readingMs, recordingKey, resolveScript, screensOf, stepsKey, styleOf, zoomOf } from "../src/script.ts";
+import type { Script, Step } from "../src/types.ts";
 import { makeScript, VIEWPORT } from "./fixtures.ts";
 
 describe("zoomOf", () => {
-  const click = (zoom: unknown) => ({ action: "click", target: "#a", zoom }) as Step;
+  const click = (zoom?: true | number): Step => ({ action: "click", target: "#a", zoom });
 
-  test("reads every zoom form", () => {
-    expect(zoomOf(click(true))).toEqual({ scale: DEFAULT_ZOOM, holdMs: 300, include: [] });
-    expect(zoomOf(click(2.5))?.scale).toBe(2.5);
-    expect(zoomOf(click({ holdMs: 900, include: ["#b"] }))).toEqual({ scale: DEFAULT_ZOOM, holdMs: 900, include: ["#b"] });
+  test("true uses the script's scale, a number its own", () => {
+    expect(zoomOf(makeScript(), click(true))).toEqual({ scale: DEFAULT_ZOOM, holdMs: 300 });
+    expect(zoomOf(makeScript({ zoom: 2.2, zoomHoldMs: 900 }), click(true))).toEqual({ scale: 2.2, holdMs: 900 });
+    expect(zoomOf(makeScript({ zoom: 2.2 }), click(1.5))?.scale).toBe(1.5);
   });
 
-  test("treats missing, false and null as no zoom", () => {
-    expect(zoomOf(click(undefined))).toBeUndefined();
-    expect(zoomOf(click(false))).toBeUndefined();
-    expect(zoomOf(click(null))).toBeUndefined();
-    expect(zoomOf({ action: "wait", ms: 100 })).toBeUndefined();
+  test("no zoom without the field", () => {
+    expect(zoomOf(makeScript(), click())).toBeUndefined();
+    expect(zoomOf(makeScript(), { action: "wait", ms: 100 })).toBeUndefined();
   });
 });
 
@@ -55,24 +53,23 @@ describe("resolveScript", () => {
 });
 
 describe("stepsKey", () => {
-  const base: Step[] = [{ action: "click", target: "#add", zoom: { scale: 2, include: ["#list li"] }, caption: "Add" }];
+  const base: Step[] = [{ action: "click", target: "#add", zoom: 2, keepInView: ["#list li"], caption: "Add" }];
 
   test("ignores what only changes the render", () => {
-    const restyled: Step[] = [{ action: "click", target: "#add", zoom: { scale: 1.2, holdMs: 50, include: ["#list li"] }, caption: "Other" }];
+    const restyled: Step[] = [{ action: "click", target: "#add", zoom: true, keepInView: ["#list li"], caption: "Other" }];
     expect(stepsKey(restyled)).toBe(stepsKey(base));
   });
 
   test("changes when the recording would change", () => {
-    expect(stepsKey([{ action: "click", target: "#other", zoom: { include: ["#list li"] } }])).not.toBe(stepsKey(base));
-    expect(stepsKey([{ action: "click", target: "#add", zoom: { include: [] } }])).not.toBe(stepsKey(base));
+    expect(stepsKey([{ action: "click", target: "#other", zoom: 2, keepInView: ["#list li"] }])).not.toBe(stepsKey(base));
+    expect(stepsKey([{ action: "click", target: "#add", zoom: 2 }])).not.toBe(stepsKey(base));
     expect(stepsKey([...base, { action: "wait", ms: 100 }])).not.toBe(stepsKey(base));
     expect(stepsKey([{ ...base[0]!, caption: "Add a row" }])).not.toBe(stepsKey(base));
   });
 
-  test("ignores captions and zoom on steps that aren't recorded", () => {
+  test("ignores captions on steps that aren't recorded", () => {
     const paused = (step: Step) => makeScript({ steps: [{ action: "pause-recording" }, step, { action: "resume-recording" }] });
-    const key = recordingKey(paused({ action: "click", target: "#a" }));
-    expect(recordingKey(paused({ action: "click", target: "#a", caption: "Two words", zoom: { include: ["#b"] } }))).toBe(key);
+    expect(recordingKey(paused({ action: "click", target: "#a", caption: "Two words" }))).toBe(recordingKey(paused({ action: "click", target: "#a" })));
   });
 
   test("ignores the switch transition, which only changes the render", () => {
@@ -105,36 +102,33 @@ describe("screensOf", () => {
 
 describe("checkScript", () => {
   const screens = { admin: { url: "a" }, member: { url: "b", frame: "mobile-iphone" as const } };
+  const problems = (overrides: Partial<Script>) => checkScript(makeScript(overrides));
 
   test("accepts switches to known screens and values saved before use", () => {
-    expect(() =>
-      checkScript(makeScript({
-        screens,
-        steps: [
-          { action: "save", as: "link", target: "#link", attribute: "href" },
-          { action: "switch", screen: "member" },
-          { action: "goto", url: "${link}" },
-        ],
-      })),
-    ).not.toThrow();
+    const steps: Step[] = [
+      { action: "save", as: "link", target: "#link", attribute: "href" },
+      { action: "switch", screen: "member" },
+      { action: "goto", url: "${link}" },
+    ];
+    expect(problems({ screens, steps })).toEqual([]);
   });
 
-  test("rejects unknown screens and frames", () => {
-    expect(() => checkScript(makeScript({ screens, steps: [{ action: "switch", screen: "nope" }] }))).toThrow(/no screen "nope"/);
-    expect(() => checkScript(makeScript({ screens: { a: { url: "a", frame: "tv" as never } } }))).toThrow(/unknown frame/);
-    expect(() => checkScript(makeScript({ screens, steps: [{ action: "switch", screen: "admin", transition: "zoom" as never }] }))).toThrow(/unknown transition/);
+  test("rejects unknown screens, with a suggestion", () => {
+    expect(problems({ screens, steps: [{ action: "switch", screen: "membr" }] })).toEqual([{ step: 0, message: expect.stringContaining('no screen "membr". Did you mean "member"?') }]);
+    expect(problems({ steps: [{ action: "switch", screen: "a" }] })[0]?.message).toContain("needs `screens`");
   });
 
-  test("rejects screen names that don't start with a letter, since those would be put out of order", () => {
-    expect(() => checkScript(makeScript({ screens: { "2": { url: "a" } } }))).toThrow(/must start with a letter/);
-    expect(() => checkScript(makeScript({ screens: { "my screen": { url: "a" } } }))).toThrow(/must start with a letter/);
+  test("rejects a value used before it is saved, and says how to fix it", () => {
+    const steps: Step[] = [{ action: "goto", url: "${link}" }, { action: "save", as: "link", from: "url" }];
+    expect(problems({ steps })).toEqual([{ step: 0, message: '"${link}" is used before it\'s saved. Add a `save` step with `as: link` before this step' }]);
   });
 
-  test("points renamed actions to their new names", () => {
-    expect(() => checkScript(makeScript({ steps: [{ action: "pause", ms: 100 } as never] }))).toThrow(/"pause" is now "wait"/);
-    expect(() => checkScript(makeScript({ steps: [{ action: "waitFor", target: "#a" } as never] }))).toThrow(/"waitFor" is now "wait-for"/);
-    expect(() => checkScript(makeScript({ steps: [{ action: "tap" } as never] }))).toThrow(/unknown action/);
-    expect(() => checkScript(makeScript({ steps: [{ action: "constructor" } as never] }))).toThrow(/unknown action/);
+  test("keep-in-view needs zoom", () => {
+    expect(problems({ steps: [{ action: "click", target: "#a", keepInView: ["#b"] }] })[0]?.message).toContain("only works with `zoom`");
+  });
+
+  test("reports every problem at once", () => {
+    expect(problems({ screens, steps: [{ action: "switch", screen: "x" }, { action: "goto", url: "${a}" }, { action: "pause-recording" }] })).toHaveLength(3);
   });
 
   describe("pausing the recording", () => {
@@ -143,15 +137,16 @@ describe("checkScript", () => {
 
     test("accepts paused steps that save and use values", () => {
       const steps: Step[] = [pause, { action: "save", as: "link", from: "url" }, { action: "goto", url: "${link}" }, resume, pause, resume];
-      expect(() => checkScript(makeScript({ steps }))).not.toThrow();
+      expect(problems({ steps })).toEqual([]);
     });
 
     test("needs every pause resumed, and no resume without a pause", () => {
-      expect(() => checkScript(makeScript({ steps: [resume, pause, { action: "click", target: "#a" }] }))).toThrow(/Step 1 .* not paused/);
-      expect(() => checkScript(makeScript({ steps: [pause, { action: "click", target: "#a" }] }))).toThrow(/Step 1 .* needs a resume-recording/);
-      expect(() => checkScript(makeScript({ steps: [pause, pause, resume] }))).toThrow(/already paused/);
+      expect(problems({ steps: [resume, pause, { action: "click", target: "#a" }] })).toEqual([
+        { step: 0, message: expect.stringContaining("not paused") },
+        { step: 1, message: expect.stringContaining("never resumed") },
+      ]);
+      expect(problems({ steps: [pause, pause, resume] })).toEqual([{ step: 1, message: expect.stringContaining("already paused at step 1") }]);
     });
-
   });
 });
 
@@ -181,7 +176,7 @@ describe("visual options on steps that aren't recorded", () => {
   const screens = { one: { url: "a" }, two: { url: "b" } };
   const shown: Step = { action: "wait", ms: 1, caption: "Shown" };
 
-  test("are ignored with a warning, except the switch used on resume", () => {
+  test("are rejected, except on the switch used on resume", () => {
     const steps: Step[] = [
       shown,
       { action: "pause-recording" },
@@ -191,26 +186,12 @@ describe("visual options on steps that aren't recorded", () => {
     ];
     const script = makeScript({ screens, steps });
     expect([...hiddenSteps(script)]).toEqual([1, 2, 4]);
-    expect(ignoredOptionsWarning(script)).toBe("Step 3 is not recorded, so its caption and zoom are ignored");
+    expect(checkScript(script)).toEqual([{ step: 2, message: "this step runs while recording is paused, so its `caption` and `zoom` are never shown. Remove them" }]);
   });
 
-  test("lists every step and option", () => {
-    const steps: Step[] = [
-      shown,
-      { action: "pause-recording" },
-      { action: "click", target: "#a", caption: "Hidden" },
-      { action: "switch", screen: "one", transition: "slide" },
-      { action: "resume-recording" },
-    ];
-    expect(ignoredOptionsWarning(makeScript({ screens, steps }))).toBe("Steps 3, 4 are not recorded, so their caption and transition are ignored");
-    expect(ignoredOptionsWarning(makeScript({ screens, steps: [shown] }))).toBeUndefined();
-    const all: Step[] = [shown, { action: "pause-recording" }, { action: "switch", screen: "one", transition: "slide", caption: "A" }, { action: "click", target: "#a", zoom: 2 }, { action: "resume-recording" }];
-    expect(ignoredOptionsWarning(makeScript({ screens, steps: all }))).toEndWith("their caption, transition and zoom are ignored");
-  });
-
-  test("rejects a value used before it is saved", () => {
-    const steps: Step[] = [{ action: "goto", url: "${link}" }, { action: "save", as: "link", from: "url" }];
-    expect(() => checkScript(makeScript({ steps }))).toThrow(/Step 1 \(goto\) uses \$\{link\}/);
+  test("a switch that ends on the screen it started from shows nothing", () => {
+    const steps: Step[] = [shown, { action: "pause-recording" }, { action: "switch", screen: "one", transition: "slide" }, { action: "resume-recording" }];
+    expect(checkScript(makeScript({ screens, steps }))).toEqual([{ step: 2, message: expect.stringContaining("its `transition` is never shown") }]);
   });
 });
 

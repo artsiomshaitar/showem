@@ -2,14 +2,13 @@ import { basename, dirname, extname, isAbsolute, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { PHONE_VIEWPORT } from "./device.ts";
 import { clamp } from "./geometry.ts";
-import { FRAMES, TRANSITIONS, type FrameKind, type Script, type Size, type Step } from "./types.ts";
+import { didYouMean } from "./schema.ts";
+import { type FrameKind, type Script, type Size, type Step } from "./types.ts";
 
 export const DEFAULT_VIEWPORT: Size = { width: 1440, height: 900 };
 export const DEFAULT_FRAME: FrameKind = "browser-safari";
 const SINGLE_SCREEN = "main";
 const VAR = /\$\{(\w+)\}/g;
-const ACTIONS: readonly string[] = ["goto", "click", "hover", "type", "press", "scroll", "wait-for", "wait", "pause-recording", "resume-recording", "switch", "save"] satisfies Step["action"][];
-const RENAMED = new Map([["pause", "wait"], ["waitFor", "wait-for"]]);
 /** Step options that only change how the video looks, not what the browser does. */
 const VISUAL_OPTIONS = ["caption", "zoom", "transition"] as const;
 
@@ -47,36 +46,46 @@ export function fillStep(step: Step, vars: Readonly<Record<string, string>>): St
   return JSON.parse(JSON.stringify(step), (key, value) => (typeof value === "string" && key !== "action" ? fillVars(value, vars) : value));
 }
 
-/** Catches mistakes before the browser starts: unknown screens or frames, and values used before they are saved. */
-export function checkScript(script: Script) {
-  if (!script.screens && !script.url) throw new Error("The script needs a `url` or `screens`");
-  if (script.screens && !Object.keys(script.screens).length) throw new Error("`screens` is empty");
-  const screens = screensOf(script);
-  for (const [name, screen] of Object.entries(script.screens ?? {})) {
-    if (!/^[A-Za-z][\w-]*$/.test(name)) throw new Error(`Screen name "${name}" must start with a letter and use only letters, digits, - and _`);
-    if (screen.frame && !FRAMES.includes(screen.frame)) throw new Error(`Screen "${name}": unknown frame "${screen.frame}". Use one of: ${FRAMES.join(", ")}`);
-  }
+export interface Problem {
+  /** Index of the step it is about, if any. */
+  step?: number;
+  message: string;
+}
+
+/** Mistakes the format alone can't catch: unknown screens, unpaired pauses, values used before they are saved, options on steps that aren't shown. */
+export function checkScript(script: Script): Problem[] {
+  const problems: Problem[] = [];
+  if (!script.screens && !script.url) problems.push({ message: "the script needs `url` (one page) or `screens`" });
+  if (script.screens && !Object.keys(script.screens).length) problems.push({ message: "`screens` is empty. Add at least one screen, or use `url` instead" });
+  const screens = Object.keys(script.screens ?? {});
   const saved = new Set<string>();
   let pausedAt: number | undefined;
   script.steps.forEach((step, i) => {
-    const where = `Step ${i + 1} (${step.action})`;
-    const renamed = RENAMED.get(step.action);
-    if (renamed) throw new Error(`${where}: "${step.action}" is now "${renamed}"`);
-    if (!ACTIONS.includes(step.action)) throw new Error(`${where}: unknown action. Use one of: ${ACTIONS.join(", ")}`);
-    if (step.action === "pause-recording" && pausedAt !== undefined) throw new Error(`${where}: recording is already paused at step ${pausedAt + 1}`);
-    if (step.action === "resume-recording" && pausedAt === undefined) throw new Error(`${where}: recording is not paused`);
-    if (step.action === "pause-recording") pausedAt = i;
+    const add = (message: string) => problems.push({ step: i, message });
+    if (step.action === "pause-recording" && pausedAt !== undefined) add(`recording is already paused at step ${pausedAt + 1}. Add \`- action: resume-recording\` before this step, or remove it`);
+    if (step.action === "resume-recording" && pausedAt === undefined) add("recording is not paused here. Remove this step, or add `- action: pause-recording` before it");
+    if (step.action === "pause-recording") pausedAt ??= i;
     if (step.action === "resume-recording") pausedAt = undefined;
-    if (step.action === "switch" && !screens[step.screen]) throw new Error(`${where}: there is no screen "${step.screen}"`);
-    if (step.action === "switch" && step.transition && !TRANSITIONS.includes(step.transition)) {
-      throw new Error(`${where}: unknown transition "${step.transition}". Use one of: ${TRANSITIONS.join(", ")}`);
-    }
+    // `screen` is missing on a step that failed its field check; that step already has its own error.
+    if (step.action === "switch" && script.screens && step.screen !== undefined && !screens.includes(step.screen)) add(`there is no screen "${step.screen}". ${didYouMean(step.screen, screens)}`);
+    if (step.action === "switch" && !script.screens) add("`switch` needs `screens` at the top of the script");
+    if ("keepInView" in step && step.keepInView && !step.zoom) add("`keep-in-view` only works with `zoom`. Add `zoom: true`, or remove it");
     for (const [, name] of JSON.stringify(step).matchAll(VAR)) {
-      if (name && !saved.has(name)) throw new Error(`${where} uses \${${name}} before a save step stores it`);
+      if (name && !saved.has(name)) add(`"\${${name}}" is used before it's saved. Add a \`save\` step with \`as: ${name}\` before this step`);
     }
     if (step.action === "save") saved.add(step.as);
   });
-  if (pausedAt !== undefined) throw new Error(`Step ${pausedAt + 1} (pause-recording) needs a resume-recording after it`);
+  if (pausedAt !== undefined) {
+    problems.push({ step: pausedAt, message: "pause-recording is never resumed. Add `- action: resume-recording` where the video should continue" });
+  } else {
+    for (const i of hiddenSteps(script)) {
+      const options = VISUAL_OPTIONS.filter((key) => (script.steps[i] as unknown as Record<string, unknown>)[key] !== undefined);
+      if (!options.length) continue;
+      const fields = options.map((key) => `\`${key}\``).join(" and ");
+      problems.push({ step: i, message: `this step runs while recording is paused, so its ${fields} ${options.length > 1 ? "are" : "is"} never shown. Remove ${options.length > 1 ? "them" : "it"}` });
+    }
+  }
+  return problems.sort((a, b) => (a.step ?? -1) - (b.step ?? -1));
 }
 
 /** A stretch of steps between `pause-recording` and `resume-recording`. */
@@ -125,28 +134,12 @@ export function hiddenSteps(script: Script): Set<number> {
   return hidden;
 }
 
-/** A warning about visual options on steps that aren't recorded, or undefined when there are none. */
-export function ignoredOptionsWarning(script: Script): string | undefined {
-  const options = new Set<string>();
-  const steps = [...hiddenSteps(script)].filter((i) => {
-    const step: Record<string, unknown> = { ...script.steps[i] };
-    const found = VISUAL_OPTIONS.filter((key) => step[key] !== undefined);
-    for (const key of found) options.add(key);
-    return found.length > 0;
-  });
-  if (!steps.length) return undefined;
-  const one = steps.length === 1;
-  const which = one ? `Step ${steps[0]! + 1} is` : `Steps ${steps.map((i) => i + 1).join(", ")} are`;
-  return `${which} not recorded, so ${one ? "its" : "their"} ${[...options].join(", ").replace(/, (?=[^,]*$)/, " and ")} ${one && options.size === 1 ? "is" : "are"} ignored`;
-}
-
 export const DEFAULT_ZOOM = 1.8;
 const DEFAULT_HOLD_MS = 300;
 
 export interface ZoomSpec {
   scale: number;
   holdMs: number;
-  include: string[];
 }
 
 export function outputOf(script: Script) {
@@ -171,12 +164,10 @@ export function styleOf(script: Script) {
   };
 }
 
-export function zoomOf(step: Step): ZoomSpec | undefined {
+export function zoomOf(script: Script, step: Step): ZoomSpec | undefined {
   const zoom = "zoom" in step ? step.zoom : undefined;
-  if (zoom === undefined || zoom === null || zoom === false) return undefined;
-  if (zoom === true) return { scale: DEFAULT_ZOOM, holdMs: DEFAULT_HOLD_MS, include: [] };
-  if (typeof zoom === "number") return { scale: zoom, holdMs: DEFAULT_HOLD_MS, include: [] };
-  return { scale: zoom.scale ?? DEFAULT_ZOOM, holdMs: zoom.holdMs ?? DEFAULT_HOLD_MS, include: zoom.include ?? [] };
+  if (!zoom) return undefined;
+  return { scale: zoom === true ? (script.zoom ?? DEFAULT_ZOOM) : zoom, holdMs: script.zoomHoldMs ?? DEFAULT_HOLD_MS };
 }
 
 function resolveUrl(url: string, baseDir: string) {
@@ -202,13 +193,6 @@ export function resolveScript(script: Script, scriptPath: string): { script: Scr
   return { script: resolved, outPath };
 }
 
-export async function loadScript(path: string) {
-  const scriptPath = resolve(path);
-  const script: Script = await Bun.file(scriptPath).json();
-  checkScript(script);
-  return resolveScript(script, scriptPath);
-}
-
 /** Average adult silent reading speed in English (Brysbaert, 2019). */
 const READING_WPM = 238;
 /** Time for the eyes to find a caption that just appeared. */
@@ -225,22 +209,16 @@ export function readingMs(caption: string) {
 }
 
 /**
- * Identifies everything in the steps that changes what gets recorded. Zoom scale and the switch
- * transition only change the render, so they are left out. Of a caption only its length counts, since
- * the recording waits for it to be read; `zoom.include` is kept because it is measured while recording.
- * On `hidden` steps neither happens, so all their visual options are left out.
+ * Identifies everything in the steps that changes what gets recorded. Zoom and the switch transition
+ * only change the render, so they are left out. Of a caption only its length counts, since the
+ * recording waits for it to be read. On `hidden` steps it isn't shown, so it is left out too.
  */
 export function stepsKey(steps: readonly Step[], hidden: ReadonlySet<number> = new Set()): string {
   return JSON.stringify(
     steps.map((step, i) => {
       const fields = Object.fromEntries(Object.entries(step).filter(([key]) => !(VISUAL_OPTIONS as readonly string[]).includes(key)));
       const caption = hidden.has(i) ? undefined : step.caption;
-      const include = hidden.has(i) ? [] : (zoomOf(step)?.include ?? []);
-      const recorded = {
-        ...fields,
-        ...(include.length ? { include } : {}),
-        ...(typeof caption === "string" ? { captionWords: wordCount(caption) } : {}),
-      };
+      const recorded = { ...fields, ...(typeof caption === "string" ? { captionWords: wordCount(caption) } : {}) };
       return Object.fromEntries(Object.entries(recorded).sort(([a], [b]) => a.localeCompare(b)));
     }),
   );

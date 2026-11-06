@@ -1,0 +1,575 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OpenDemo script",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "A JSON Schema for editors. Ignored by OpenDemo."
+    },
+    "url": {
+      "type": "string",
+      "description": "The page to record. Use this or `screens`."
+    },
+    "screens": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[A-Za-z][\\w-]*$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The page this screen opens first."
+          },
+          "frame": {
+            "type": "string",
+            "enum": [
+              "browser-safari",
+              "browser-chrome",
+              "mobile-iphone",
+              "none"
+            ],
+            "description": "browser-safari (default), browser-chrome, mobile-iphone or none. Phones show taps instead of a cursor."
+          },
+          "viewport": {
+            "type": "object",
+            "properties": {
+              "width": {
+                "type": "number",
+                "minimum": 1
+              },
+              "height": {
+                "type": "number",
+                "minimum": 1
+              }
+            },
+            "required": [
+              "width",
+              "height"
+            ],
+            "additionalProperties": false,
+            "description": "The page size in CSS pixels. Default: the top-level viewport. Not for phone frames, which have their own size."
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "description": "Named screens, each its own browser page with its own cookies. The first one is on camera at the start. Use this or `url`."
+    },
+    "viewport": {
+      "type": "object",
+      "properties": {
+        "width": {
+          "type": "number",
+          "minimum": 1
+        },
+        "height": {
+          "type": "number",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "width",
+        "height"
+      ],
+      "additionalProperties": false,
+      "description": "The page size in CSS pixels. Default: 1440 x 900."
+    },
+    "device-scale-factor": {
+      "type": "number",
+      "minimum": 1,
+      "description": "Pixel density of the recording. Default: 3."
+    },
+    "zoom": {
+      "type": "number",
+      "minimum": 1,
+      "description": "The scale of `zoom: true` steps. Default: 1.8."
+    },
+    "zoom-hold-ms": {
+      "type": "number",
+      "minimum": 0,
+      "description": "How long the camera stays zoomed after a step ends. Default: 300."
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Where to write the video. `--out` on the command line overrides it. Default: the script's name with .mp4, or opendemo.mp4 for a script from stdin."
+        },
+        "width": {
+          "type": "number",
+          "minimum": 1,
+          "description": "Default: 2560."
+        },
+        "height": {
+          "type": "number",
+          "minimum": 1,
+          "description": "Default: 1440."
+        },
+        "fps": {
+          "type": "number",
+          "minimum": 1,
+          "description": "Default: 60."
+        }
+      },
+      "additionalProperties": false,
+      "description": "The video file."
+    },
+    "style": {
+      "type": "object",
+      "properties": {
+        "background": {
+          "type": "string",
+          "description": "An image file shown behind the window."
+        },
+        "padding": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Space around the window, as a share of the video size. Default: 0.08."
+        },
+        "radius": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Corner radius of the window, as a share of the video size. Default: 0.018."
+        },
+        "shadow": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Window shadow, 0 to 1. Default: 0.6."
+        },
+        "motion-blur": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "0 (off) to 1 (strong), only while the camera or cursor moves. Default: 0.5."
+        },
+        "cursor": {
+          "type": "object",
+          "properties": {
+            "size": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Default: 1."
+            },
+            "travel-ms": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Longest time the pointer takes to move to a target. Default: 800."
+            }
+          },
+          "additionalProperties": false,
+          "description": "The pointer."
+        },
+        "captions": {
+          "type": "object",
+          "properties": {
+            "font-size": {
+              "type": "number",
+              "minimum": 1,
+              "description": "In video pixels. Default: 3% of the video height."
+            }
+          },
+          "additionalProperties": false,
+          "description": "Caption text."
+        }
+      },
+      "additionalProperties": false,
+      "description": "How the video looks. Changing it only needs `opendemo render`."
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "goto"
+                ]
+              },
+              "url": {
+                "type": "string",
+                "description": "A full URL, or a path relative to the current page."
+              },
+              "caption": {
+                "type": "string",
+                "description": "Text shown before the step runs, until the next caption. The step waits until it can be read."
+              }
+            },
+            "required": [
+              "action",
+              "url"
+            ],
+            "additionalProperties": false,
+            "description": "Open a URL."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "click"
+                ]
+              },
+              "target": {
+                "type": "string",
+                "description": "The element, as a Playwright selector: `text=Save`, `#id`, `button:has-text(\"Save\")`, `[data-testid=x]`. Quote selectors that start with #."
+              },
+              "zoom": {
+                "anyOf": [
+                  {
+                    "const": true
+                  },
+                  {
+                    "type": "number",
+                    "minimum": 1
+                  }
+                ],
+                "description": "Zoom in on the target: `true` uses the script's `zoom` scale, a number zooms to that scale."
+              },
+              "keep-in-view": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "The element, as a Playwright selector: `text=Save`, `#id`, `button:has-text(\"Save\")`, `[data-testid=x]`. Quote selectors that start with #."
+                },
+                "description": "Other elements to keep in frame with the target while zoomed, usually what the step changes (a new row, a toast). Needs `zoom`."
+              },
+              "caption": {
+                "type": "string",
+                "description": "Text shown before the step runs, until the next caption. The step waits until it can be read."
+              }
+            },
+            "required": [
+              "action",
+              "target"
+            ],
+            "additionalProperties": false,
+            "description": "Move the pointer to an element and click it. On a phone screen, tap it."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "hover"
+                ]
+              },
+              "target": {
+                "type": "string",
+                "description": "The element, as a Playwright selector: `text=Save`, `#id`, `button:has-text(\"Save\")`, `[data-testid=x]`. Quote selectors that start with #."
+              },
+              "zoom": {
+                "anyOf": [
+                  {
+                    "const": true
+                  },
+                  {
+                    "type": "number",
+                    "minimum": 1
+                  }
+                ],
+                "description": "Zoom in on the target: `true` uses the script's `zoom` scale, a number zooms to that scale."
+              },
+              "keep-in-view": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "The element, as a Playwright selector: `text=Save`, `#id`, `button:has-text(\"Save\")`, `[data-testid=x]`. Quote selectors that start with #."
+                },
+                "description": "Other elements to keep in frame with the target while zoomed, usually what the step changes (a new row, a toast). Needs `zoom`."
+              },
+              "caption": {
+                "type": "string",
+                "description": "Text shown before the step runs, until the next caption. The step waits until it can be read."
+              }
+            },
+            "required": [
+              "action",
+              "target"
+            ],
+            "additionalProperties": false,
+            "description": "Move the pointer over an element without clicking."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "type"
+                ]
+              },
+              "target": {
+                "type": "string",
+                "description": "The element, as a Playwright selector: `text=Save`, `#id`, `button:has-text(\"Save\")`, `[data-testid=x]`. Quote selectors that start with #."
+              },
+              "text": {
+                "type": "string",
+                "description": "What to type."
+              },
+              "delay-ms": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Pause between keys. Default: 60."
+              },
+              "zoom": {
+                "anyOf": [
+                  {
+                    "const": true
+                  },
+                  {
+                    "type": "number",
+                    "minimum": 1
+                  }
+                ],
+                "description": "Zoom in on the target: `true` uses the script's `zoom` scale, a number zooms to that scale."
+              },
+              "keep-in-view": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "The element, as a Playwright selector: `text=Save`, `#id`, `button:has-text(\"Save\")`, `[data-testid=x]`. Quote selectors that start with #."
+                },
+                "description": "Other elements to keep in frame with the target while zoomed, usually what the step changes (a new row, a toast). Needs `zoom`."
+              },
+              "caption": {
+                "type": "string",
+                "description": "Text shown before the step runs, until the next caption. The step waits until it can be read."
+              }
+            },
+            "required": [
+              "action",
+              "target",
+              "text"
+            ],
+            "additionalProperties": false,
+            "description": "Click an input and type into it, one key at a time."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "press"
+                ]
+              },
+              "key": {
+                "type": "string",
+                "description": "A key name as Playwright writes it: Enter, Tab, Escape, ArrowDown, Meta+A."
+              },
+              "caption": {
+                "type": "string",
+                "description": "Text shown before the step runs, until the next caption. The step waits until it can be read."
+              }
+            },
+            "required": [
+              "action",
+              "key"
+            ],
+            "additionalProperties": false,
+            "description": "Press a key or a key combination."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "scroll"
+                ]
+              },
+              "y": {
+                "type": "number",
+                "description": "Pixels to scroll: positive goes down, negative goes up."
+              },
+              "caption": {
+                "type": "string",
+                "description": "Text shown before the step runs, until the next caption. The step waits until it can be read."
+              }
+            },
+            "required": [
+              "action",
+              "y"
+            ],
+            "additionalProperties": false,
+            "description": "Scroll the page with the mouse wheel."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "wait-for"
+                ]
+              },
+              "target": {
+                "type": "string",
+                "description": "The element to wait for, as a Playwright selector."
+              },
+              "caption": {
+                "type": "string",
+                "description": "Text shown before the step runs, until the next caption. The step waits until it can be read."
+              }
+            },
+            "required": [
+              "action",
+              "target"
+            ],
+            "additionalProperties": false,
+            "description": "Wait until an element is visible. Use it after anything that loads."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "wait"
+                ]
+              },
+              "ms": {
+                "type": "number",
+                "minimum": 0,
+                "description": "How long, in milliseconds."
+              },
+              "caption": {
+                "type": "string",
+                "description": "Text shown before the step runs, until the next caption. The step waits until it can be read."
+              }
+            },
+            "required": [
+              "action",
+              "ms"
+            ],
+            "additionalProperties": false,
+            "description": "Wait, so the viewer can take in what is on screen."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "switch"
+                ]
+              },
+              "screen": {
+                "type": "string",
+                "description": "The name of a screen from `screens`."
+              },
+              "transition": {
+                "type": "string",
+                "enum": [
+                  "fade",
+                  "slide"
+                ],
+                "description": "How the video moves there: fade (default) or slide. A slide goes left to a screen listed later in `screens`, right to one listed earlier."
+              },
+              "caption": {
+                "type": "string",
+                "description": "Text shown before the step runs, until the next caption. The step waits until it can be read."
+              }
+            },
+            "required": [
+              "action",
+              "screen"
+            ],
+            "additionalProperties": false,
+            "description": "Move the video to another screen. The steps after it run there."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "save"
+                ]
+              },
+              "as": {
+                "type": "string",
+                "pattern": "^\\w+$",
+                "description": "The name later steps use as `${name}`. Letters, digits and _."
+              },
+              "target": {
+                "type": "string",
+                "description": "The element to read, as a Playwright selector. Its text is stored, or its `attribute`."
+              },
+              "attribute": {
+                "type": "string",
+                "description": "An attribute of the target to store instead of its text, like href or value. href and src come back as full URLs."
+              },
+              "from": {
+                "type": "string",
+                "enum": [
+                  "url",
+                  "clipboard"
+                ],
+                "description": "Store the current page URL, or the clipboard (after a step that copies). Use instead of `target`."
+              },
+              "caption": {
+                "type": "string",
+                "description": "Text shown before the step runs, until the next caption. The step waits until it can be read."
+              }
+            },
+            "required": [
+              "action",
+              "as"
+            ],
+            "additionalProperties": false,
+            "description": "Store a value that only exists while the script runs (a link, an ID it just created). Later steps use it as `${name}` in any text. Takes no time in the video."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "pause-recording"
+                ]
+              }
+            },
+            "required": [
+              "action"
+            ],
+            "additionalProperties": false,
+            "description": "Stop recording, like the pause button on a screen recorder. The steps after it still run, at full speed, but aren't in the video. Use it for setup the viewer doesn't need to see. They can't have captions or zoom."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "resume-recording"
+                ]
+              }
+            },
+            "required": [
+              "action"
+            ],
+            "additionalProperties": false,
+            "description": "Continue recording after pause-recording. If a paused `switch` moved to another screen, the video moves there using that switch's transition and caption."
+          }
+        ]
+      }
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "steps"
+  ]
+}

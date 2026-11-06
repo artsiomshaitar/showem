@@ -72,7 +72,7 @@ function buildShots(script: Script, rec: Recording, screen: string, layout: Layo
   const cuts = [...navigations, ...settled].sort((a, b) => a - b);
   return rec.steps.flatMap((log) => {
     const step = log.screen === screen ? script.steps[log.index] : undefined;
-    const zoom = step && zoomOf(step);
+    const zoom = step && zoomOf(script, step);
     const { point, actionAt, shotBox } = log;
     if (!zoom || !point || actionAt === undefined) return [];
     const nextNavigation = navigations.find((t) => t > actionAt) ?? Infinity;

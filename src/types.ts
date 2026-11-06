@@ -14,24 +14,23 @@ export interface Sample extends Point {
   t: number;
 }
 
-export interface ZoomOptions {
-  scale?: number;
-  holdMs?: number;
-  include?: string[];
-}
-
-export type Zoom = boolean | number | ZoomOptions;
-
 interface StepBase {
   caption?: string;
+}
+
+interface Zoomable {
+  /** `true` for the script's zoom scale, or a scale. */
+  zoom?: true | number;
+  /** Other elements to keep in frame while zoomed, measured while recording. */
+  keepInView?: string[];
 }
 
 export type Step = StepBase &
   (
     | { action: "goto"; url: string }
-    | { action: "click"; target: string; zoom?: Zoom }
-    | { action: "hover"; target: string; zoom?: Zoom }
-    | { action: "type"; target: string; text: string; delayMs?: number; zoom?: Zoom }
+    | ({ action: "click"; target: string } & Zoomable)
+    | ({ action: "hover"; target: string } & Zoomable)
+    | ({ action: "type"; target: string; text: string; delayMs?: number } & Zoomable)
     | { action: "press"; key: string }
     | { action: "scroll"; y: number }
     | { action: "wait-for"; target: string }
@@ -62,6 +61,10 @@ export interface Script {
   screens?: Record<string, ScreenOptions>;
   viewport?: Size;
   deviceScaleFactor?: number;
+  /** The scale of `zoom: true` steps. */
+  zoom?: number;
+  /** How long the camera stays zoomed after a step ends. */
+  zoomHoldMs?: number;
   output?: Partial<Size> & { path?: string; fps?: number };
   style?: {
     background?: string;

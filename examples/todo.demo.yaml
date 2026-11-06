@@ -1,0 +1,42 @@
+url: ./todo/index.html
+viewport:
+  width: 1440
+  height: 900
+output:
+  path: todo.mp4
+  width: 2560
+  height: 1440
+  fps: 60
+style:
+  background: ./assets/background.jpg
+  padding: 0.08
+  radius: 0.018
+  shadow: 0.6
+  motion-blur: 0.5
+
+steps:
+  - action: wait
+    ms: 1200
+    caption: A simple task list
+
+  - action: type
+    target: "#new"
+    text: Record a demo with OpenDemo
+    zoom: true
+    caption: Type a new task
+
+  - action: click
+    target: "#add"
+    zoom: true
+    keep-in-view:
+      - "#list li:last-child"
+    caption: Add it to the list
+
+  - action: click
+    target: li:nth-child(1) input
+    zoom: 1.8
+    caption: Check off what's done
+
+  - action: wait
+    ms: 1000
+    caption: Progress updates right away

@@ -31,7 +31,7 @@ beforeAll(async () => {
         { action: "goto", url: "./form.html" },
         { action: "resume-recording" },
         { action: "type", target: "#name", text: "Ada", delayMs: 10, zoom: 2, caption: "Type a name" },
-        { action: "click", target: "#save", zoom: { include: ["#done"] } },
+        { action: "click", target: "#save", zoom: true, keepInView: ["#done"] },
         { action: "wait-for", target: "#done" },
         { action: "pause-recording" },
         { action: "type", target: "#name", text: " Lovelace" },

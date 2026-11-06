@@ -15,19 +15,33 @@ bun link   # optional: makes `opendemo` available globally
 ## Usage
 
 ```sh
-opendemo run examples/todo.demo.json      # record + render
-opendemo record examples/todo.demo.json   # only record
-opendemo render examples/todo.demo.json   # only render, from the last recording
+opendemo check examples/todo.demo.yaml    # check the script, without running anything
+opendemo run examples/todo.demo.yaml      # record + render
+opendemo record examples/todo.demo.yaml   # only record
+opendemo render examples/todo.demo.yaml   # only render, from the last recording
 ```
 
-`examples/team.demo.json` shows two screens: an admin page in a browser and a member app on a phone, with live updates between them. The admin logs in (`admin@northwind.test` / `northwind`) while recording is paused, so the video starts on the admin page. It needs the sample server running first:
+Scripts are YAML or JSON. Pass `-` instead of a path to read the script from stdin, so an agent can send it without saving a file. `--out` sets where the video goes, instead of the script's `output.path`:
+
+```sh
+opendemo run - --out /tmp/demos/new-project.mp4 <<'EOF'
+url: http://localhost:3000
+steps:
+  - action: click
+    target: text=New project
+    zoom: true
+    caption: Create a project
+EOF
+```
+
+`examples/team.demo.yaml` shows two screens: an admin page in a browser and a member app on a phone, with live updates between them. The admin logs in (`admin@northwind.test` / `northwind`) while recording is paused, so the video starts on the admin page. It needs the sample server running first:
 
 ```sh
 bun examples/team/server.ts &
-opendemo run examples/team.demo.json
+opendemo run examples/team.demo.yaml
 ```
 
-See [`skill/opendemo/SKILL.md`](skill/opendemo/SKILL.md) for the script format. To give it to Claude Code, copy or link `skill/opendemo` into `~/.claude/skills/`.
+`opendemo docs` prints the script format, and `opendemo docs <action>` one action's fields with an example. [`skill/opendemo/SKILL.md`](skill/opendemo/SKILL.md) is the guide for agents. [`opendemo.schema.json`](opendemo.schema.json) describes it as JSON Schema, for autocomplete and inline errors in editors: add `# yaml-language-server: $schema=<path to opendemo.schema.json>` at the top of a YAML script. After changing the format, regenerate it with `bun src/cli.ts schema > opendemo.schema.json`. To give it to Claude Code, copy or link `skill/opendemo` into `~/.claude/skills/`.
 
 ## How it works
 
@@ -35,7 +49,7 @@ See [`skill/opendemo/SKILL.md`](skill/opendemo/SKILL.md) for the script format. 
 2. **Plan** (`src/plan.ts`, `src/camera.ts`): zoom shots from the steps marked `zoom`, joined into pans when close and split at page navigations, followed by a critically damped spring. Cursor path and caption timing come from the recording.
 3. **Render** (`src/render.ts`, `src/frames.ts`, `src/draw.ts`): the video is split into ranges, and each range is drawn by its own process with Skia (`@napi-rs/canvas`): background, browser window or phone frame, page, cursor or taps, and captions, with a fade or slide where the script switches screens, also when it resumes recording on a different screen, with the camera applied to the whole frame. Motion blur blends sub-frames while something moves. Each process encodes its part with ffmpeg (`src/ffmpeg.ts`), and the parts are joined without re-encoding.
 
-`opendemo render` only works while the steps match the recording. Changing zoom scale, style or a caption's wording (same number of words) is fine; changing screens, actions, targets, `zoom.include` or a caption's length needs `opendemo run`, because the recording waits for each caption to be read.
+`opendemo render` only works while the steps match the recording. Changing zoom scale, style or a caption's wording (same number of words) is fine; changing screens, actions, targets, `keep-in-view` or a caption's length needs `opendemo run`, because the recording waits for each caption to be read.
 
 ## Development
 
