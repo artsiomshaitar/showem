@@ -5,7 +5,7 @@ import { caretOf, MIRRORED_STYLES } from "./caret.ts";
 import { TAP_LEAD_MS } from "./device.ts";
 import { center, union } from "./geometry.ts";
 import { cursorPath, TRANSITION_MS, travelMs } from "./motion.ts";
-import { fillStep, isPhone, NOTICE_MS, readingMs, recordingKey, screensOf, styleOf, zoomOf } from "./script.ts";
+import { fillStep, ignoredOptionsWarning, isPhone, NOTICE_MS, pausesOf, readingMs, recordingKey, screensOf, styleOf, zoomOf, type Pause } from "./script.ts";
 import type { Box, Frame, Point, Recording, Sample, Script, ScreenRecording, Step, StepLog, Switch } from "./types.ts";
 
 const DEFAULT_SCALE_FACTOR = 3;
@@ -28,6 +28,36 @@ const SAVE_TIMEOUT_MS = 5000;
 const CAPTION_HOLD_MS = 600;
 
 type SaveStep = Extract<Step, { action: "save" }>;
+
+/** Recording time: time since the start, leaving out the stretches when recording was paused. */
+class Clock {
+  readonly t0 = Date.now();
+  private readonly pauses: { start: number; end: number }[] = [];
+
+  readonly now = () => this.at(Date.now());
+
+  /** The recording time of a wall-clock time. Anything during a pause is at the moment the pause began. */
+  at(wall: number) {
+    // Exactly the pause's own start, so frames during a pause and `now()` while paused agree to the last digit.
+    wall = this.pauses.find((p) => wall >= p.start && wall < p.end)?.start ?? wall;
+    let t = wall - this.t0;
+    for (const p of this.pauses) t -= Math.max(0, Math.min(wall, p.end) - p.start);
+    return t;
+  }
+
+  get paused() {
+    return this.pauses.at(-1)?.end === Infinity;
+  }
+
+  /** With `fromStart`, everything so far is left out too, for a pause before anything was shown. */
+  pause(fromStart = false) {
+    this.pauses.push({ start: fromStart ? (this.pauses.at(-1)?.end ?? this.t0) : Date.now(), end: Infinity });
+  }
+
+  resume() {
+    this.pauses.at(-1)!.end = Date.now();
+  }
+}
 
 /**
  * Drives one screen's page and logs everything the planner needs: pointer path, clicks, caret, step timing.
@@ -58,7 +88,10 @@ class Director {
     await this.page.mouse.move(this.pos.x, this.pos.y);
   }
 
-  /** Puts the mouse in the middle, also on touch screens, where it is still what scroll wheel events are aimed at. */
+  /**
+   * Puts the mouse where the drawn pointer is: in the middle at first, also on touch screens, where it is still
+   * what scroll wheel events are aimed at. Again on resume, since paused steps move it without drawing it.
+   */
   async start() {
     await this.page.mouse.move(this.pos.x, this.pos.y);
   }
@@ -66,9 +99,6 @@ class Director {
   async run(step: Step, log: StepLog) {
     const { page } = this;
     switch (step.action) {
-      case "goto":
-        await page.goto(new URL(step.url, page.url()).href, { waitUntil: "load" });
-        break;
       case "click":
       case "hover":
       case "type": {
@@ -86,9 +116,6 @@ class Director {
         if (step.action === "type") await this.type(step.target, step.text, step.delayMs ?? KEY_DELAY_MS, log);
         break;
       }
-      case "press":
-        await page.keyboard.press(step.key);
-        break;
       case "scroll": {
         const ticks = Math.max(1, Math.round(Math.abs(step.y) / SCROLL_PX_PER_TICK));
         for (let i = 0; i < ticks; i++) {
@@ -97,10 +124,47 @@ class Director {
         }
         break;
       }
-      case "waitFor":
+      default:
+        await this.runAnyway(step);
+    }
+  }
+
+  /** Runs a step while recording is paused: at full speed, with no pointer travel, clicks or caret to log. */
+  async runOffCamera(step: Step) {
+    const { page } = this;
+    switch (step.action) {
+      case "click":
+      case "type": {
+        const loc = page.locator(step.target).first();
+        await (this.touch ? loc.tap() : loc.click());
+        if (step.action === "type") await page.keyboard.type(step.text);
+        break;
+      }
+      case "hover":
+        await page.locator(step.target).first().hover();
+        break;
+      case "scroll":
+        await page.mouse.wheel(0, step.y);
+        break;
+      default:
+        await this.runAnyway(step);
+    }
+  }
+
+  /** The steps that run the same whether recording or not. */
+  private async runAnyway(step: Step) {
+    const { page } = this;
+    switch (step.action) {
+      case "goto":
+        await page.goto(new URL(step.url, page.url()).href, { waitUntil: "load" });
+        break;
+      case "press":
+        await page.keyboard.press(step.key);
+        break;
+      case "wait-for":
         await page.locator(step.target).first().waitFor({ state: "visible" });
         break;
-      case "pause":
+      case "wait":
         await Bun.sleep(step.ms);
         break;
     }
@@ -194,6 +258,8 @@ class Director {
 }
 
 export async function record(script: Script, dir: string): Promise<Recording> {
+  const warning = ignoredOptionsWarning(script);
+  if (warning) console.error(warning);
   const framesDir = join(dir, "frames");
   await rm(framesDir, { recursive: true, force: true });
 
@@ -218,8 +284,8 @@ export async function record(script: Script, dir: string): Promise<Recording> {
       }),
     );
 
-    const t0 = Date.now();
-    const now = () => Date.now() - t0;
+    const clock = new Clock();
+    const { now } = clock;
     const writes: Promise<number>[] = [];
     const travel = styleOf(script).travelMs;
     const live = await Promise.all(
@@ -234,7 +300,8 @@ export async function record(script: Script, dir: string): Promise<Recording> {
         cdp.on("Page.screencastFrame", ({ data, metadata, sessionId }) => {
           cdp.send("Page.screencastFrameAck", { sessionId }).catch(() => {});
           const file = `${name}/${String(frames.length).padStart(6, "0")}.jpg`;
-          frames.push({ file, t: Math.max(0, metadata.timestamp ? metadata.timestamp * 1000 - t0 : now()) });
+          // Wall-clock time for now: a pause can start before an earlier frame, so these become recording times at the end.
+          frames.push({ file, t: metadata.timestamp ? metadata.timestamp * 1000 : Date.now() });
           writes.push(Bun.write(join(framesDir, file), Buffer.from(data, "base64")));
         });
         await cdp.send("Page.startScreencast", {
@@ -250,50 +317,103 @@ export async function record(script: Script, dir: string): Promise<Recording> {
     );
     const directors = new Map(live.map((s) => [s.name, s.director]));
 
-    await Bun.sleep(LEAD_IN_MS);
-    const firstScreen = live[0]!.name;
+    let firstScreen = live[0]!.name;
     let active = firstScreen;
     const vars: Record<string, string> = {};
     const switches: Switch[] = [];
+    const pauses = pausesOf(script);
+    // Set while paused when resuming changes screens. `captionAt` and `reading` are for the paused switch's caption.
+    let resumeSwitch: (Pick<Switch, "step" | "leave" | "from"> & { captionAt: number; reading: number }) | undefined;
+    let pause: Pause | undefined;
+    // The video starts with the first step that isn't paused.
+    const leadInAt = script.steps.findIndex((_, i) => !pauses.some((p) => p.start <= i && i <= p.end));
     const steps: StepLog[] = [];
     for (const [index, original] of script.steps.entries()) {
       const step = fillStep(original, vars);
+      if (index === leadInAt) {
+        await Bun.sleep(LEAD_IN_MS);
+        firstScreen = active;
+      }
       const log: StepLog = { index, screen: active, start: now(), end: 0 };
       const director = directors.get(active)!;
-      // A caption shows first and the step waits until it has been read, so the viewer can watch what happens next.
-      // On a switch the caption only needs to be noticed before the slide; the rest is read during and after it.
-      const reading = step.caption ? readingMs(step.caption) : 0;
-      if (step.action !== "switch") await Bun.sleep(step.action === "pause" ? Math.max(0, reading - step.ms) : reading);
-      if (step.action === "switch") {
-        if (step.screen !== active) {
-          const leave = log.start;
+      if (step.action === "pause-recording") {
+        pause = pauses.find((p) => p.start === index)!;
+        const step = pause.switchStep;
+        if (step !== undefined) {
+          const caption = script.steps[step]?.caption;
+          const reading = caption ? readingMs(caption) : 0;
           await Bun.sleep(BEFORE_SWITCH_MS);
-          log.start = now();
+          const captionAt = now();
           if (reading) await Bun.sleep(NOTICE_MS);
-          const start = now();
-          await Bun.sleep(TRANSITION_MS);
-          switches.push({ step: index, leave, start, end: now(), from: active, to: step.screen });
-          await director.park();
-          active = log.screen = step.screen;
-          await Bun.sleep(Math.max(AFTER_SWITCH_MS, reading - (now() - log.start)));
-        } else {
-          await Bun.sleep(reading);
+          resumeSwitch = { step, leave: log.start, from: active, captionAt, reading };
         }
-      } else if (step.action === "save") {
-        vars[step.as] = await director.save(step);
+        clock.pause(pause.atStart);
+      } else if (step.action === "resume-recording") {
+        await director.page.waitForLoadState("load");
+        await Bun.sleep(SETTLE_MS);
+        for (const d of directors.values()) await d.start();
+        // Taken while still paused: the moment every frame captured during the pause is stamped with.
+        const start = now();
+        clock.resume();
+        if (resumeSwitch) {
+          const { captionAt, reading, ...change } = resumeSwitch;
+          await Bun.sleep(TRANSITION_MS);
+          switches.push({ ...change, start, end: now(), to: active, freezeOutgoing: true });
+          resumeSwitch = undefined;
+          await Bun.sleep(Math.max(AFTER_SWITCH_MS, reading - (now() - captionAt)));
+          // Like a visible switch step, the paused one lasts until the screen it moved to has settled.
+          steps.find((l) => l.index === change.step)!.end = now();
+        }
+      } else if (clock.paused) {
+        if (step.action === "switch") {
+          // Not the screen the video resumes on, which should come back with its pointer where it was.
+          if (active !== pause?.to) await director.park();
+          active = log.screen = step.screen;
+          // Its caption shows before the transition, like a visible switch's.
+          if (index === resumeSwitch?.step) log.start = resumeSwitch.captionAt;
+        } else if (step.action === "save") {
+          vars[step.as] = await director.save(step);
+        } else {
+          await director.runOffCamera(step);
+        }
       } else {
-        await director.run(step, log);
-        if (step.action !== "pause" && step.action !== "waitFor") await Bun.sleep(step.caption ? CAPTION_HOLD_MS : SETTLE_MS);
-        const include = zoomOf(step)?.include ?? [];
-        if (include.length && "target" in step) log.shotBox = await director.shotBox(step.target, include);
+        // A caption shows first and the step waits until it has been read, so the viewer can watch what happens next.
+        // On a switch the caption only needs to be noticed before the slide; the rest is read during and after it.
+        const reading = step.caption ? readingMs(step.caption) : 0;
+        if (step.action !== "switch") await Bun.sleep(step.action === "wait" ? Math.max(0, reading - step.ms) : reading);
+        if (step.action === "switch") {
+          if (step.screen !== active) {
+            const leave = log.start;
+            await Bun.sleep(BEFORE_SWITCH_MS);
+            log.start = now();
+            if (reading) await Bun.sleep(NOTICE_MS);
+            const start = now();
+            await Bun.sleep(TRANSITION_MS);
+            switches.push({ step: index, leave, start, end: now(), from: active, to: step.screen });
+            await director.park();
+            active = log.screen = step.screen;
+            await Bun.sleep(Math.max(AFTER_SWITCH_MS, reading - (now() - log.start)));
+          } else {
+            await Bun.sleep(reading);
+          }
+        } else if (step.action === "save") {
+          vars[step.as] = await director.save(step);
+        } else {
+          await director.run(step, log);
+          if (step.action !== "wait" && step.action !== "wait-for") await Bun.sleep(step.caption ? CAPTION_HOLD_MS : SETTLE_MS);
+          const include = zoomOf(step)?.include ?? [];
+          if (include.length && "target" in step) log.shotBox = await director.shotBox(step.target, include);
+        }
       }
       log.end = now();
       steps.push(log);
     }
+    if (leadInAt === -1) firstScreen = active;
     await Bun.sleep(LEAD_OUT_MS);
     const duration = now();
     await Promise.all(live.map((s) => s.cdp.send("Page.stopScreencast")));
     await Promise.all(writes);
+    for (const s of live) for (const f of s.frames) f.t = Math.max(0, clock.at(f.t));
 
     const recording: Recording = {
       key: recordingKey(script),

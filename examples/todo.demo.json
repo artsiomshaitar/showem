@@ -10,10 +10,10 @@
     "motionBlur": 0.5
   },
   "steps": [
-    { "action": "pause", "ms": 1200, "caption": "A simple task list" },
+    { "action": "wait", "ms": 1200, "caption": "A simple task list" },
     { "action": "type", "target": "#new", "text": "Record a demo with OpenDemo", "zoom": true, "caption": "Type a new task" },
     { "action": "click", "target": "#add", "zoom": { "include": ["#list li:last-child"] }, "caption": "Add it to the list" },
     { "action": "click", "target": "li:nth-child(1) input", "zoom": 1.8, "caption": "Check off what's done" },
-    { "action": "pause", "ms": 1000, "caption": "Progress updates right away" }
+    { "action": "wait", "ms": 1000, "caption": "Progress updates right away" }
   ]
 }

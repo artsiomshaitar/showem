@@ -34,7 +34,7 @@ test("a tap fades in at its spot before it lands, then fades out", () => {
 });
 
 test("each caption lasts until the next one, with saved values filled in", () => {
-  const steps: Step[] = [{ action: "pause", ms: 1, caption: "One" }, { action: "pause", ms: 1 }, { action: "pause", ms: 1, caption: "Record ${id}" }];
+  const steps: Step[] = [{ action: "wait", ms: 1, caption: "One" }, { action: "wait", ms: 1 }, { action: "wait", ms: 1, caption: "Record ${id}" }];
   const script = makeScript({ steps });
   const rec = makeRecording(script, {
     duration: 900,
@@ -73,6 +73,28 @@ test("the scene follows the switches, with each step's transition", () => {
   expect(sceneAt(script, rec, 2000)).toEqual({ screen: "b" });
   expect(sceneAt(script, rec, 3250)).toMatchObject({ transition: "slide", direction: -1 });
   expect(sceneAt(script, rec, 3600)).toEqual({ screen: "a" });
+});
+
+test("a switch on resume moves from the moment before the pause to the screen it resumes on, with the paused switch's transition", () => {
+  const steps: Step[] = [
+    { action: "wait", ms: 1 },
+    { action: "pause-recording" },
+    { action: "switch", screen: "b", transition: "slide", caption: "To b" },
+    { action: "click", target: "#x", caption: "Hidden" },
+    { action: "resume-recording" },
+  ];
+  const script = makeScript({ screens: { a: { url: "a" }, b: { url: "b" } }, steps });
+  const rec = makeRecording(script, {
+    firstScreen: "a",
+    screens: { a: makeScreen(), b: makeScreen() },
+    switches: [{ step: 2, leave: 500, start: 1000, end: 1500, from: "a", to: "b", freezeOutgoing: true }],
+    steps: steps.map((_, index) => ({ index, screen: "a", start: index === 2 ? 900 : 100 * index, end: 100 * index })),
+  });
+  expect(sceneAt(script, rec, 800)).toEqual({ screen: "a" });
+  expect(sceneAt(script, rec, 1250)).toMatchObject({ from: "a", to: "b", k: 0.5, transition: "slide", direction: 1 });
+  expect(buildCaptions(script, rec).map((c) => [c.text, c.start])).toEqual([["To b", 900]]);
+  expect(sceneAt(script, rec, 1250)).toHaveProperty("fromAt", expect.closeTo(1000, 1));
+  expect(sceneAt(script, rec, 1600)).toEqual({ screen: "b" });
 });
 
 describe("assertRecordingMatches", () => {

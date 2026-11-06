@@ -1,0 +1,157 @@
+{
+  "screens": {
+    "admin": {
+      "url": "http://localhost:4321/admin?reset",
+      "frame": "browser-safari"
+    },
+    "member": {
+      "url": "http://localhost:4321/",
+      "frame": "mobile-iphone"
+    }
+  },
+  "output": {
+    "path": "team-throwaway.mp4",
+    "width": 2560,
+    "height": 1440,
+    "fps": 60
+  },
+  "style": {
+    "background": "./assets/background.jpg",
+    "padding": 0.08,
+    "radius": 0.018,
+    "shadow": 0.6,
+    "motionBlur": 0.5
+  },
+  "steps": [
+    {
+      "action": "pause-recording"
+    },
+    {
+      "action": "type",
+      "target": "#email",
+      "text": "admin@northwind.test"
+    },
+    {
+      "action": "type",
+      "target": "#password",
+      "text": "northwind"
+    },
+    {
+      "action": "click",
+      "target": "#login"
+    },
+    {
+      "action": "wait-for",
+      "target": "#invite"
+    },
+    {
+      "action": "resume-recording"
+    },
+    {
+      "action": "wait",
+      "ms": 1200,
+      "caption": "Case 1. Resume on the same screen"
+    },
+    {
+      "action": "pause-recording"
+    },
+    {
+      "action": "click",
+      "target": "#invite"
+    },
+    {
+      "action": "wait-for",
+      "target": "#invite-card"
+    },
+    {
+      "action": "save",
+      "as": "link",
+      "target": "#invite-link",
+      "attribute": "href"
+    },
+    {
+      "action": "resume-recording"
+    },
+    {
+      "action": "wait",
+      "ms": 1200,
+      "caption": "The invite link just appears, no fade"
+    },
+    {
+      "action": "wait",
+      "ms": 1200,
+      "caption": "Case 2. Resume on another screen"
+    },
+    {
+      "action": "pause-recording"
+    },
+    {
+      "action": "switch",
+      "screen": "member",
+      "transition": "slide",
+      "caption": "Slide to the phone, Sam already joined"
+    },
+    {
+      "action": "goto",
+      "url": "${link}"
+    },
+    {
+      "action": "type",
+      "target": "#name",
+      "text": "Sam Rivera"
+    },
+    {
+      "action": "click",
+      "target": "text=Join team"
+    },
+    {
+      "action": "wait-for",
+      "target": "#feed"
+    },
+    {
+      "action": "resume-recording"
+    },
+    {
+      "action": "wait",
+      "ms": 1200
+    },
+    {
+      "action": "wait",
+      "ms": 1200,
+      "caption": "Case 3. Paused captions and zoom are ignored"
+    },
+    {
+      "action": "pause-recording"
+    },
+    {
+      "action": "switch",
+      "screen": "admin",
+      "caption": "You should not see this"
+    },
+    {
+      "action": "type",
+      "target": "#announcement",
+      "text": "Standup moves to 10:30 tomorrow",
+      "zoom": 1.6,
+      "caption": "Or this"
+    },
+    {
+      "action": "click",
+      "target": "#post",
+      "zoom": true
+    },
+    {
+      "action": "switch",
+      "screen": "member",
+      "transition": "slide"
+    },
+    {
+      "action": "resume-recording"
+    },
+    {
+      "action": "wait",
+      "ms": 2000,
+      "caption": "The post lands on the phone, nothing else"
+    }
+  ]
+}

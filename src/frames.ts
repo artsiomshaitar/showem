@@ -150,7 +150,8 @@ export async function renderFrames(job: FrameJob, onFrame?: () => void) {
     const [dxA, dxB] = slideOffsets(change);
     const e = easeInOutCubic(change.k);
     ctx.drawImage(background, 0, 0, width, height);
-    await drawScene(ctx, change.from, frameT, t, screenOf(change.from).camera(t), { pointer: 1 - e, dx: dxA });
+    const fromT = change.fromAt ?? t;
+    await drawScene(ctx, change.from, change.fromAt ?? frameT, fromT, screenOf(change.from).camera(fromT), { pointer: 1 - e, dx: dxA });
     await drawScene(ctx, change.to, frameT, t, screenOf(change.to).camera(t), { pointer: e, dx: dxB });
   }
 
@@ -190,7 +191,8 @@ export async function renderFrames(job: FrameJob, onFrame?: () => void) {
         await drawSlide(ctx, "screen" in at ? { ...now, k: 0 } : at, t, tk);
       });
     } else {
-      await drawScene(outCtx, now.from, t, t, screenOf(now.from).camera(t), { pointer: 1 });
+      const fromT = now.fromAt ?? t;
+      await drawScene(outCtx, now.from, fromT, fromT, screenOf(now.from).camera(fromT), { pointer: 1 });
       await drawScene(sceneCtx, now.to, t, t, screenOf(now.to).camera(t), { pointer: 1 });
       outCtx.globalAlpha = easeInOutCubic(now.k);
       outCtx.drawImage(scene, 0, 0);

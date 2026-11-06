@@ -3,7 +3,7 @@ import { TAP_LEAD_MS } from "./device.ts";
 import { CAPTION_FADE_MS } from "./draw.ts";
 import { clamp, lerp } from "./geometry.ts";
 import { layout, type Layout } from "./layout.ts";
-import { fillVars, isPhone, recordingKey } from "./script.ts";
+import { fillVars, hiddenSteps, isPhone, recordingKey } from "./script.ts";
 import { indexAt, itemAt } from "./timeline.ts";
 import type { Recording, ScreenRecording, Script, Transition } from "./types.ts";
 
@@ -38,8 +38,11 @@ export interface ScreenPlan {
 /**
  * What is on camera: one screen, or a transition from one to another (`k` goes 0..1).
  * `direction` is 1 when going to a screen listed later in `screens` (slides to the left), -1 when going back.
+ * `fromAt` is set when the outgoing screen is frozen: `from` is drawn as it was at that moment.
  */
-export type Scene = { screen: string } | { from: string; to: string; k: number; transition: Transition; direction: 1 | -1 };
+export type Scene =
+  | { screen: string }
+  | { from: string; to: string; k: number; transition: Transition; direction: 1 | -1; fromAt?: number };
 
 export interface Plan {
   screens: Record<string, ScreenPlan>;
@@ -85,8 +88,9 @@ export function buildTap(screen: ScreenRecording): (t: number) => TapState | und
 
 /** Each caption shows from the start of its step until the next caption starts. The last one is gone before the video ends. */
 export function buildCaptions(script: Script, rec: Recording): Caption[] {
+  const hidden = hiddenSteps(script);
   const marks = rec.steps.flatMap((log) => {
-    const text = script.steps[log.index]?.caption;
+    const text = hidden.has(log.index) ? undefined : script.steps[log.index]?.caption;
     return text ? [{ text: fillVars(text, rec.vars), start: log.start }] : [];
   });
   return marks.map((mark, i) => ({ ...mark, end: marks[i + 1]?.start ?? rec.duration - CAPTION_FADE_MS }));
@@ -103,6 +107,7 @@ export function sceneAt(script: Script, rec: Recording, t: number): Scene {
       k: (t - change.start) / (change.end - change.start),
       transition: (step?.action === "switch" && step.transition) || "fade",
       direction: order.indexOf(change.to) > order.indexOf(change.from) ? 1 : -1,
+      ...(change.freezeOutgoing && { fromAt: change.start - 0.001 }),
     };
   }
   return { screen: rec.switches.findLast((s) => s.end <= t)?.to ?? rec.firstScreen };

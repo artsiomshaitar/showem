@@ -8,6 +8,10 @@ export const DEFAULT_VIEWPORT: Size = { width: 1440, height: 900 };
 export const DEFAULT_FRAME: FrameKind = "browser-safari";
 const SINGLE_SCREEN = "main";
 const VAR = /\$\{(\w+)\}/g;
+const ACTIONS: readonly string[] = ["goto", "click", "hover", "type", "press", "scroll", "wait-for", "wait", "pause-recording", "resume-recording", "switch", "save"] satisfies Step["action"][];
+const RENAMED = new Map([["pause", "wait"], ["waitFor", "wait-for"]]);
+/** Step options that only change how the video looks, not what the browser does. */
+const VISUAL_OPTIONS = ["caption", "zoom", "transition"] as const;
 
 export interface Screen {
   url: string;
@@ -53,8 +57,16 @@ export function checkScript(script: Script) {
     if (screen.frame && !FRAMES.includes(screen.frame)) throw new Error(`Screen "${name}": unknown frame "${screen.frame}". Use one of: ${FRAMES.join(", ")}`);
   }
   const saved = new Set<string>();
+  let pausedAt: number | undefined;
   script.steps.forEach((step, i) => {
     const where = `Step ${i + 1} (${step.action})`;
+    const renamed = RENAMED.get(step.action);
+    if (renamed) throw new Error(`${where}: "${step.action}" is now "${renamed}"`);
+    if (!ACTIONS.includes(step.action)) throw new Error(`${where}: unknown action. Use one of: ${ACTIONS.join(", ")}`);
+    if (step.action === "pause-recording" && pausedAt !== undefined) throw new Error(`${where}: recording is already paused at step ${pausedAt + 1}`);
+    if (step.action === "resume-recording" && pausedAt === undefined) throw new Error(`${where}: recording is not paused`);
+    if (step.action === "pause-recording") pausedAt = i;
+    if (step.action === "resume-recording") pausedAt = undefined;
     if (step.action === "switch" && !screens[step.screen]) throw new Error(`${where}: there is no screen "${step.screen}"`);
     if (step.action === "switch" && step.transition && !TRANSITIONS.includes(step.transition)) {
       throw new Error(`${where}: unknown transition "${step.transition}". Use one of: ${TRANSITIONS.join(", ")}`);
@@ -64,6 +76,68 @@ export function checkScript(script: Script) {
     }
     if (step.action === "save") saved.add(step.as);
   });
+  if (pausedAt !== undefined) throw new Error(`Step ${pausedAt + 1} (pause-recording) needs a resume-recording after it`);
+}
+
+/** A stretch of steps between `pause-recording` and `resume-recording`. */
+export interface Pause {
+  /** Indexes of the pause-recording and resume-recording steps. */
+  start: number;
+  end: number;
+  /** The screen on camera when recording pauses, and the one when it resumes. */
+  from: string;
+  to: string;
+  /** Whether nothing was shown before the pause, so the video starts on `to`. */
+  atStart: boolean;
+  /** Set when the video changes screens on resume (never at the start): the last switch while paused, whose transition and caption are used then. */
+  switchStep?: number;
+}
+
+/** Every paused stretch in a script that passed `checkScript`. */
+export function pausesOf(script: Script): Pause[] {
+  let screen = Object.keys(screensOf(script))[0]!;
+  let shown = false;
+  let open: Omit<Pause, "end" | "to"> | undefined;
+  const pauses: Pause[] = [];
+  script.steps.forEach((step, i) => {
+    if (step.action === "switch") screen = step.screen;
+    if (step.action === "pause-recording") {
+      open = { start: i, from: screen, atStart: !shown };
+    } else if (step.action === "resume-recording" && open) {
+      const changesScreen = !open.atStart && screen !== open.from;
+      pauses.push({ ...open, end: i, to: screen, switchStep: changesScreen ? open.switchStep : undefined });
+      open = undefined;
+    } else if (open) {
+      if (step.action === "switch") open.switchStep = i;
+    } else {
+      shown = true;
+    }
+  });
+  return pauses;
+}
+
+/** Steps that don't appear in the video, so their visual options are not used. */
+export function hiddenSteps(script: Script): Set<number> {
+  const hidden = new Set<number>();
+  for (const pause of pausesOf(script)) {
+    for (let i = pause.start; i <= pause.end; i++) if (i !== pause.switchStep) hidden.add(i);
+  }
+  return hidden;
+}
+
+/** A warning about visual options on steps that aren't recorded, or undefined when there are none. */
+export function ignoredOptionsWarning(script: Script): string | undefined {
+  const options = new Set<string>();
+  const steps = [...hiddenSteps(script)].filter((i) => {
+    const step: Record<string, unknown> = { ...script.steps[i] };
+    const found = VISUAL_OPTIONS.filter((key) => step[key] !== undefined);
+    for (const key of found) options.add(key);
+    return found.length > 0;
+  });
+  if (!steps.length) return undefined;
+  const one = steps.length === 1;
+  const which = one ? `Step ${steps[0]! + 1} is` : `Steps ${steps.map((i) => i + 1).join(", ")} are`;
+  return `${which} not recorded, so ${one ? "its" : "their"} ${[...options].join(", ").replace(/, (?=[^,]*$)/, " and ")} ${one && options.size === 1 ? "is" : "are"} ignored`;
 }
 
 export const DEFAULT_ZOOM = 1.8;
@@ -140,7 +214,10 @@ const READING_WPM = 238;
 /** Time for the eyes to find a caption that just appeared. */
 export const NOTICE_MS = 400;
 
-const wordCount = (text: string) => text.split(/\s+/).filter(Boolean).length;
+/** A saved value not filled in yet (a paused switch's caption may use one saved later) counts as this many words. */
+const VALUE_WORDS = 3;
+
+const wordCount = (text: string) => text.replace(VAR, Array(VALUE_WORDS).fill("x").join(" ")).split(/\s+/).filter(Boolean).length;
 
 /** How long a viewer needs to read a caption. The recording waits this long before the captioned step acts. */
 export function readingMs(caption: string) {
@@ -151,12 +228,14 @@ export function readingMs(caption: string) {
  * Identifies everything in the steps that changes what gets recorded. Zoom scale and the switch
  * transition only change the render, so they are left out. Of a caption only its length counts, since
  * the recording waits for it to be read; `zoom.include` is kept because it is measured while recording.
+ * On `hidden` steps neither happens, so all their visual options are left out.
  */
-export function stepsKey(steps: readonly Step[]): string {
+export function stepsKey(steps: readonly Step[], hidden: ReadonlySet<number> = new Set()): string {
   return JSON.stringify(
-    steps.map((step) => {
-      const { caption, zoom: _zoom, transition: _transition, ...fields }: Record<string, unknown> = { ...step };
-      const include = zoomOf(step)?.include ?? [];
+    steps.map((step, i) => {
+      const fields = Object.fromEntries(Object.entries(step).filter(([key]) => !(VISUAL_OPTIONS as readonly string[]).includes(key)));
+      const caption = hidden.has(i) ? undefined : step.caption;
+      const include = hidden.has(i) ? [] : (zoomOf(step)?.include ?? []);
       const recorded = {
         ...fields,
         ...(include.length ? { include } : {}),
@@ -169,5 +248,5 @@ export function stepsKey(steps: readonly Step[]): string {
 
 /** Identifies everything that changes what gets recorded: the screens and the steps. */
 export function recordingKey(script: Script): string {
-  return JSON.stringify([screensOf(script), JSON.parse(stepsKey(script.steps))]);
+  return JSON.stringify([screensOf(script), JSON.parse(stepsKey(script.steps, hiddenSteps(script)))]);
 }

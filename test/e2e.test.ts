@@ -27,10 +27,17 @@ beforeAll(async () => {
       deviceScaleFactor: 1,
       output: { width: 480, height: 270, fps: 30 },
       steps: [
+        { action: "pause-recording" },
         { action: "goto", url: "./form.html" },
+        { action: "resume-recording" },
         { action: "type", target: "#name", text: "Ada", delayMs: 10, zoom: 2, caption: "Type a name" },
         { action: "click", target: "#save", zoom: { include: ["#done"] } },
-        { action: "waitFor", target: "#done" },
+        { action: "wait-for", target: "#done" },
+        { action: "pause-recording" },
+        { action: "type", target: "#name", text: " Lovelace" },
+        { action: "wait", ms: 1500 },
+        { action: "resume-recording" },
+        { action: "wait", ms: 300 },
       ],
     },
     scriptPath,
@@ -41,11 +48,26 @@ beforeAll(async () => {
 afterAll(() => rm(dir, { recursive: true, force: true }));
 
 test("records every step, including a relative goto", () => {
-  expect(rec.steps).toHaveLength(4);
+  expect(rec.steps).toHaveLength(11);
   expect(rec.screens.main?.urls.map((u) => u.url.split("/").pop())).toEqual(["start.html", "form.html"]);
-  expect(rec.steps[1]?.caret?.length).toBe(4);
-  expect(rec.steps[2]?.shotBox).toBeDefined();
+  expect(rec.steps[3]?.caret?.length).toBe(4);
+  expect(rec.steps[4]?.shotBox).toBeDefined();
   expect(rec.screens.main?.frames.length).toBeGreaterThan(0);
+});
+
+test("leaves paused steps out of the recording", () => {
+  const main = rec.screens.main!;
+  // Paused at the start: the video opens on the form, with nothing to fade from.
+  expect(main.urls[1]?.t).toBe(0);
+  // Paused and resumed on the same screen: the video just carries on.
+  expect(rec.switches).toEqual([]);
+  const [pause, typed, wait, resume] = rec.steps.slice(6, 10);
+  expect(typed?.start).toBe(pause!.end);
+  expect(wait?.end).toBe(typed!.start);
+  expect(resume!.end - pause!.start).toBeLessThan(300);
+  expect(typed?.caret).toBeUndefined();
+  expect(main.clicks).toHaveLength(2);
+  expect(main.frames.map((f) => f.t)).toEqual(main.frames.map((f) => f.t).toSorted((a, b) => a - b));
 });
 
 test("renders a video with one frame per output tick", async () => {

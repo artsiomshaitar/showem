@@ -1,9 +1,12 @@
 // A small team app for the multi-screen demo: an admin page and a phone app that share live state.
 // Run it with `bun examples/team/server.ts`. Opening /admin?reset starts from the seed data again.
+// The admin page needs a login: admin@northwind.test / northwind.
 import { join } from "node:path";
 
 const PORT = Number(process.env.PORT ?? 4321);
 const ORIGIN = `http://localhost:${PORT}`;
+const ADMIN = { email: "admin@northwind.test", password: "northwind" };
+const sessions = new Set<string>();
 
 interface Member { id: string; name: string; role: "Admin" | "Member"; joinedAt: number }
 interface Post { id: string; author: string; text: string; at: number }
@@ -41,7 +44,16 @@ Bun.serve({
     const path = url.pathname;
     if (path === "/admin") {
       if (url.searchParams.has("reset")) reset();
-      return page("admin.html");
+      const session = req.headers.get("cookie")?.match(/session=(\w+)/)?.[1];
+      return session && sessions.has(session) ? page("admin.html") : Response.redirect(`${ORIGIN}/login`, 302);
+    }
+    if (path === "/login") return page("login.html");
+    if (path === "/api/login" && req.method === "POST") {
+      const { email, password } = await req.json();
+      if (email !== ADMIN.email || password !== ADMIN.password) return new Response("Wrong email or password", { status: 401 });
+      const session = id();
+      sessions.add(session);
+      return Response.json({ ok: true }, { headers: { "Set-Cookie": `session=${session}; Path=/; SameSite=Lax` } });
     }
     if (path === "/" || path === "/feed" || path.startsWith("/invite/")) return page("app.html");
     if (path === "/api/events") {

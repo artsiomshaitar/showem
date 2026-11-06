@@ -34,8 +34,10 @@ export type Step = StepBase &
     | { action: "type"; target: string; text: string; delayMs?: number; zoom?: Zoom }
     | { action: "press"; key: string }
     | { action: "scroll"; y: number }
-    | { action: "waitFor"; target: string }
-    | { action: "pause"; ms: number }
+    | { action: "wait-for"; target: string }
+    | { action: "wait"; ms: number }
+    | { action: "pause-recording" }
+    | { action: "resume-recording" }
     | { action: "switch"; screen: string; transition?: Transition }
     | ({ action: "save"; as: string } & ({ target: string; attribute?: string } | { from: "url" | "clipboard" }))
   );
@@ -103,14 +105,19 @@ export interface ScreenRecording {
 
 /** A change from one screen to another: the transition runs from `start` to `end`. */
 export interface Switch {
-  /** Index of the `switch` step. */
+  /** Index of the `switch` step. On resuming a paused recording, the last switch while paused. */
   step: number;
-  /** When the switch step began; the screen being left zooms out from here. */
+  /** When the switch (or pause) step began; the screen being left zooms out from here. */
   leave: number;
   start: number;
   end: number;
   from: string;
   to: string;
+  /**
+   * Draw the outgoing screen (`from`) at its last frame before `start` for the whole transition.
+   * Set when the switch happens on resuming a paused recording: that screen kept changing off camera while paused.
+   */
+  freezeOutgoing?: boolean;
 }
 
 export interface Recording {

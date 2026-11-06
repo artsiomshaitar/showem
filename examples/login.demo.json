@@ -10,15 +10,15 @@
     "motionBlur": 0.5
   },
   "steps": [
-    { "action": "pause", "ms": 1000, "caption": "Sign in to your tasks" },
+    { "action": "wait", "ms": 1000, "caption": "Sign in to your tasks" },
     { "action": "type", "target": "#email", "text": "alex@example.com", "zoom": 1.8, "caption": "Enter your email" },
     { "action": "type", "target": "#password", "text": "correct-horse", "zoom": 1.8, "caption": "And your password" },
     { "action": "click", "target": "#login", "zoom": 1.8, "caption": "Log in" },
-    { "action": "waitFor", "target": "#new" },
-    { "action": "pause", "ms": 800, "caption": "Your task list" },
+    { "action": "wait-for", "target": "#new" },
+    { "action": "wait", "ms": 800, "caption": "Your task list" },
     { "action": "type", "target": "#new", "text": "Record a demo with OpenDemo", "zoom": true, "caption": "Type a new task" },
     { "action": "click", "target": "#add", "zoom": { "include": ["#list li:last-child"] }, "caption": "Add it to the list" },
     { "action": "click", "target": "li:nth-child(1) input", "zoom": 1.8, "caption": "Check off what's done" },
-    { "action": "pause", "ms": 1000, "caption": "Progress updates right away" }
+    { "action": "wait", "ms": 1000, "caption": "Progress updates right away" }
   ]
 }

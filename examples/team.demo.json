@@ -12,19 +12,25 @@
     "motionBlur": 0.5
   },
   "steps": [
-    { "action": "pause", "ms": 1200, "caption": "The admin invites a teammate" },
+    { "action": "pause-recording" },
+    { "action": "type", "target": "#email", "text": "admin@northwind.test" },
+    { "action": "type", "target": "#password", "text": "northwind" },
+    { "action": "click", "target": "#login" },
+    { "action": "wait-for", "target": "#invite" },
+    { "action": "resume-recording" },
+    { "action": "wait", "ms": 1200, "caption": "The admin invites a teammate" },
     { "action": "click", "target": "#invite", "zoom": { "scale": 1.6, "include": ["#invite-card"] } },
     { "action": "save", "as": "link", "target": "#invite-link", "attribute": "href" },
     { "action": "switch", "screen": "member", "transition": "slide", "caption": "Sam opens the invite on their phone" },
     { "action": "goto", "url": "${link}" },
     { "action": "type", "target": "#name", "text": "Sam Rivera", "zoom": 1.5 },
     { "action": "click", "target": "text=Join team", "caption": "One tap to join" },
-    { "action": "waitFor", "target": "#feed" },
+    { "action": "wait-for", "target": "#feed" },
     { "action": "switch", "screen": "admin", "transition": "slide", "caption": "Sam shows up for the admin right away" },
-    { "action": "pause", "ms": 800 },
+    { "action": "wait", "ms": 800 },
     { "action": "type", "target": "#announcement", "text": "Standup moves to 10:30 tomorrow", "zoom": 1.6, "caption": "Post an announcement" },
     { "action": "click", "target": "#post", "zoom": { "scale": 1.6, "include": ["#posts li:first-child"] } },
     { "action": "switch", "screen": "member", "caption": "It lands on Sam's phone, live" },
-    { "action": "pause", "ms": 2200 }
+    { "action": "wait", "ms": 2200 }
   ]
 }
