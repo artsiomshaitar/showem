@@ -7,7 +7,7 @@ Your agent writes a short script. showem plays it in a headless browser and turn
 ## Install
 
 ```sh
-curl -fsSL https://showem.shaitar.com/install | sh
+curl -fsSL https://showem.shaitar.com/install.sh | sh
 ```
 
 Or with Homebrew:

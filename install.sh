@@ -1,5 +1,5 @@
 #!/bin/sh
-# Installs showem into ~/.showem/bin: curl -fsSL https://showem.shaitar.com/install | sh
+# Installs showem into ~/.showem/bin: curl -fsSL https://showem.shaitar.com/install.sh | sh
 set -eu
 
 REPO="artsiomshaitar/showem"
