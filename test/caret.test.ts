@@ -1,12 +1,13 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import { chromium, type Browser, type Page } from "playwright-core";
 import { caretOf, MIRRORED_STYLES } from "../src/caret.ts";
+import { ensureTool } from "../src/deps.ts";
 
 let browser: Browser;
 let page: Page;
 
 beforeAll(async () => {
-  browser = await chromium.launch({ headless: true });
+  browser = await chromium.launch({ executablePath: await ensureTool("chromium"), headless: true });
   page = await browser.newPage();
   await page.setContent(`
     <style>input, textarea, span { font: 16px Arial; } input, textarea { padding: 6px 10px; border: 1px solid; width: 400px; }</style>
