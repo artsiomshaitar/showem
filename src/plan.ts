@@ -55,7 +55,7 @@ const TAP_OUT_MS = 420;
 
 export function assertRecordingMatches(script: Script, rec: Recording) {
   if (rec.key !== recordingKey(script)) {
-    throw new Error("The screens or steps changed since this was recorded. Use `opendemo run` to record again.");
+    throw new Error("The screens or steps changed since this was recorded. Use `showem run` to record again.");
   }
 }
 

@@ -126,7 +126,7 @@ export const ACTIONS: Record<Step["action"], ActionSpec> = {
 const ACTION_NAMES = Object.keys(ACTIONS);
 
 export const TOP = object({
-  $schema: text("A JSON Schema for editors. Ignored by OpenDemo."),
+  $schema: text("A JSON Schema for editors. Ignored by showem."),
   url: text("The page to record. Use this or `screens`."),
   screens: {
     kind: "named",
@@ -148,7 +148,7 @@ export const TOP = object({
   "zoom-hold-ms": num("How long the camera stays zoomed after a step ends. Default: 300.", { min: 0 }),
   output: object(
     {
-      path: text("Where to write the video. `--out` on the command line overrides it. Default: the script's name with .mp4, or opendemo.mp4 for a script from stdin."),
+      path: text("Where to write the video. `--out` on the command line overrides it. Default: the script's name with .mp4, or showem.mp4 for a script from stdin."),
       width: num("Default: 2560.", { min: 1 }),
       height: num("Default: 1440.", { min: 1 }),
       fps: num("Default: 60.", { min: 1 }),
@@ -167,7 +167,7 @@ export const TOP = object({
       captions: object({ "font-size": num("In video pixels. Default: 3% of the video height.", { min: 1 }) }, [], "Caption text."),
     },
     [],
-    "How the video looks. Changing it only needs `opendemo render`.",
+    "How the video looks. Changing it only needs `showem render`.",
   ),
 });
 
@@ -293,7 +293,7 @@ function stepName(raw: unknown) {
 /** Reads a script from a file, or from stdin when `arg` is `-`. Relative paths in a script from stdin resolve from the current folder. */
 export async function loadScript(arg: string) {
   const stdin = arg === "-";
-  const path = stdin ? join(process.cwd(), "opendemo.yaml") : resolve(arg);
+  const path = stdin ? join(process.cwd(), "showem.yaml") : resolve(arg);
   const source = stdin ? await Bun.stdin.text() : await Bun.file(path).text();
   const { script, problems, stepAt } = parseScript(source, stdin ? "<stdin>" : arg);
   if (problems.length) return { problems };
@@ -306,7 +306,7 @@ export function scriptJsonSchema() {
   const steps = Object.entries(ACTIONS).map(([name, spec]) => ({ ...jsonSchema(fieldsOf(name, spec)), description: spec.doc }));
   return {
     $schema: "http://json-schema.org/draft-07/schema#",
-    title: "OpenDemo script",
+    title: "showem script",
     ...top,
     properties: { ...top.properties, steps: { type: "array", items: { anyOf: steps } } },
     required: ["steps"],

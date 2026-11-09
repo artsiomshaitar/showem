@@ -13,7 +13,7 @@ let outPath: string;
 let rec: Recording;
 
 beforeAll(async () => {
-  dir = await mkdtemp(join(tmpdir(), "opendemo-screens-"));
+  dir = await mkdtemp(join(tmpdir(), "showem-screens-"));
   await Bun.write(
     join(dir, "admin.html"),
     `<a id="link" href="./member.html?id=42">Open</a>

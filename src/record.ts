@@ -2,6 +2,7 @@ import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { chromium, devices, type Browser, type Locator, type Page } from "playwright-core";
 import { caretOf, MIRRORED_STYLES } from "./caret.ts";
+import { ensureTool } from "./deps.ts";
 import { TAP_LEAD_MS } from "./device.ts";
 import { center, union } from "./geometry.ts";
 import { menuLayout, rowBox } from "./menu.ts";
@@ -507,7 +508,7 @@ export async function record(script: Script, dir: string): Promise<Recording> {
   // The screencast only sends device pixels when the scale is forced for the whole browser, so all screens share it.
   const scaleFactor = script.deviceScaleFactor ?? DEFAULT_SCALE_FACTOR;
   // Without the GPU, headless Chromium redraws effects like a blurred backdrop on the CPU, and at 3x it films about 5 frames a second.
-  const browser = await chromium.launch({ headless: true, args: [`--force-device-scale-factor=${scaleFactor}`, "--enable-gpu"] });
+  const browser = await chromium.launch({ executablePath: await ensureTool("chromium"), headless: true, args: [`--force-device-scale-factor=${scaleFactor}`, "--enable-gpu"] });
   try {
     const screens = await openScreens(browser, script, scaleFactor);
     for (const { name } of screens) await mkdir(join(framesDir, name), { recursive: true });

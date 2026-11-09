@@ -110,7 +110,7 @@ describe("assertRecordingMatches", () => {
   });
 
   test("rejects steps or screens that were changed after recording", () => {
-    expect(() => assertRecordingMatches({ ...script, steps: [] }, rec)).toThrow(/opendemo run/);
+    expect(() => assertRecordingMatches({ ...script, steps: [] }, rec)).toThrow(/showem run/);
     expect(() => assertRecordingMatches({ ...script, steps: [{ action: "click", target: "#b", caption: "Hello" }] }, rec)).toThrow();
     expect(() => assertRecordingMatches({ ...script, screens: { main: { url: script.url!, frame: "mobile-iphone" } } }, rec)).toThrow();
   });

@@ -1,11 +1,11 @@
 ---
-name: opendemo
+name: showem
 description: Record a polished demo video of a web app without touching the user's screen. Use when the user asks for a demo, demo video, screen recording, product video, or a video showing a feature or a pull request. Runs a headless browser, then renders zooms, a smooth cursor, captions, motion blur and a background into an MP4.
 ---
 
-# Make a demo video with OpenDemo
+# Make a demo video with showem
 
-OpenDemo runs a step script in a headless browser and renders the video. The user's screen and mouse are never used, so they can keep working.
+showem runs a step script in a headless browser and renders the video. The user's screen and mouse are never used, so they can keep working.
 
 ## 1. Understand the app first
 
@@ -25,10 +25,10 @@ Make sure the app is running and has realistic data. If it's already running, us
 
 ## 3. Write the script
 
-Scripts are YAML (JSON works too, with the same fields). Pass the script to OpenDemo on stdin with `-`. Don't save it to a file unless the user asks for one:
+Scripts are YAML (JSON works too, with the same fields). Pass the script to showem on stdin with `-`. Don't save it to a file unless the user asks for one:
 
 ```sh
-opendemo check - <<'EOF'
+showem check - <<'EOF'
 url: http://localhost:3000
 steps:
   - action: wait
@@ -42,7 +42,7 @@ steps:
 EOF
 ```
 
-Always quote the marker (`<<'EOF'`), or the shell replaces `${name}` before OpenDemo sees it. Relative paths and URLs resolve from the current folder (from the script's folder when it's a file).
+Always quote the marker (`<<'EOF'`), or the shell replaces `${name}` before showem sees it. Relative paths and URLs resolve from the current folder (from the script's folder when it's a file).
 
 A full script:
 
@@ -104,17 +104,17 @@ Each step is a list item that starts with `action:`. Its other fields go on the 
 The actions are `goto`, `click`, `hover`, `type`, `select`, `press`, `scroll`, `wait-for`, `wait`, `switch`, `save`, `zoom-in`, `zoom-out`, `pause-recording` and `resume-recording`. For the exact fields:
 
 ```sh
-opendemo docs           # every top-level field, how steps work, and the list of actions
-opendemo docs click     # one action: what it does, its fields, and an example
+showem docs           # every top-level field, how steps work, and the list of actions
+showem docs click     # one action: what it does, its fields, and an example
 ```
 
-Look up an action with `opendemo docs <action>` before using a field you're not sure about. Don't guess field names.
+Look up an action with `showem docs <action>` before using a field you're not sure about. Don't guess field names.
 
 Every step except `pause-recording` and `resume-recording` can have a `caption`. It stays on screen until the next caption. The caption shows first and the step waits until it can be read, so viewers read it and then watch what happens.
 
 - `target` is a Playwright selector: `text=Save`, `#id`, `button:has-text("Save")`, `[data-testid=x]`. Put quotes around any selector that starts with `#`, or YAML reads it as a comment.
-- `select` picks a dropdown option by its visible text (`option: Waiting on parts`). Use it for every dropdown, native `<select>` or one made of page elements: OpenDemo tells them apart and shows the menu in the video either way. For a native one, `target` is the `<select>`; otherwise it's the element that opens the dropdown.
-- `type` works on native date and time inputs too: write the value (`2:00 PM`, `2026-11-07`, `2026-11-07T14:00`) and OpenDemo types it into the input's parts. Don't press keys to move between the parts.
+- `select` picks a dropdown option by its visible text (`option: Waiting on parts`). Use it for every dropdown, native `<select>` or one made of page elements: showem tells them apart and shows the menu in the video either way. For a native one, `target` is the `<select>`; otherwise it's the element that opens the dropdown.
+- `type` works on native date and time inputs too: write the value (`2:00 PM`, `2026-11-07`, `2026-11-07T14:00`) and showem types it into the input's parts. Don't press keys to move between the parts.
 - To show something without pointing at it, `scroll` with `target` brings it smoothly into view. Steps that point at an element already scroll to it. `y` (pixels) is for scrolling by an amount.
 - `zoom` (on click, hover, type, select): `true` uses the script's `zoom` scale, a number zooms to that scale. Zoom on the steps that matter, not on every step. Close zooms are joined into one smooth pan. On a zoomed `type` step the camera follows the last typed word.
 - `keep-in-view`: a list of other elements to keep in frame with the target while zoomed, usually what the step changes (a new row, a toast). The camera zooms out below the scale if they don't fit.
@@ -215,23 +215,23 @@ Put preparation nobody needs to watch (signing in, opening the right page, closi
 
 ## 4. Check, try, then run
 
-Run `opendemo check -` with the script. It lists every problem at once, each with the line, the step and how to fix it. Fix them all (use `opendemo docs <action>` when a step's fields are wrong) and check again until it prints `OK`.
+Run `showem check -` with the script. It lists every problem at once, each with the line, the step and how to fix it. Fix them all (use `showem docs <action>` when a step's fields are wrong) and check again until it prints `OK`.
 
-Then run `opendemo try -` with the script and the same `--out` you'll record with. It runs the steps in the browser at full speed, without recording or rendering and skipping `wait` steps, so it takes seconds. A `wait` is only for viewers: to wait for the app, use `wait-for`. It stops at the first step that fails, with its line and the error, and saves a screenshot of each screen where it stopped (or at the end). Look at the screenshots, fix the script, and try again until it prints `OK`. Use it instead of writing your own browser scripts to test selectors. The steps really run, so anything they change in the app stays changed: put the app's data back before recording if the flow needs it.
+Then run `showem try -` with the script and the same `--out` you'll record with. It runs the steps in the browser at full speed, without recording or rendering and skipping `wait` steps, so it takes seconds. A `wait` is only for viewers: to wait for the app, use `wait-for`. It stops at the first step that fails, with its line and the error, and saves a screenshot of each screen where it stopped (or at the end). Look at the screenshots, fix the script, and try again until it prints `OK`. Use it instead of writing your own browser scripts to test selectors. The steps really run, so anything they change in the app stays changed: put the app's data back before recording if the flow needs it.
 
 Only then record:
 
 ```sh
-opendemo run - --out /tmp/demos/invite-flow.mp4 <<'EOF'
+showem run - --out /tmp/demos/invite-flow.mp4 <<'EOF'
 ...the same script...
 EOF
 ```
 
-`--out` sets where the video goes. Always pass it: use the path the user asked for, or a folder outside their project, so the video and its work files don't end up in their repo. The recording (frames and a log, which can be large) is kept next to the video in `<video>.opendemo/`. Without `--out`, the video goes to the script's `output.path`, or `opendemo.mp4` in the current folder.
+`--out` sets where the video goes. Always pass it: use the path the user asked for, or a folder outside their project, so the video and its work files don't end up in their repo. The recording (frames and a log, which can be large) is kept next to the video in `<video>.showem/`. Without `--out`, the video goes to the script's `output.path`, or `showem.mp4` in the current folder.
 
 `run` prints the MP4 path. Run it in the background if it's long.
 
-To change only the look (style, zoom, transitions, a caption's wording with the same number of words), pass the changed script to `opendemo render -` with the same `--out`. It reuses the recording. Anything else needs `run`.
+To change only the look (style, zoom, transitions, a caption's wording with the same number of words), pass the changed script to `showem render -` with the same `--out`. It reuses the recording. Anything else needs `run`.
 
 ## 5. Look at the video before handing it over
 
@@ -241,4 +241,6 @@ Extract a few frames and look at them:
 ffmpeg -v error -i /tmp/demos/invite-flow.mp4 -vf "fps=1/2,scale=640:-1,tile=3x2" -frames:v 1 /tmp/demos/contact.jpg
 ```
 
-Check that every step happened, zooms land on the right element, and captions are readable. If a step failed, fix it with `opendemo try` and run again.
+If `ffmpeg` isn't on the PATH, use the one showem downloaded: `~/.showem/ffmpeg-*/ffmpeg`.
+
+Check that every step happened, zooms land on the right element, and captions are readable. If a step failed, fix it with `showem try` and run again.

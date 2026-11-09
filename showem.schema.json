@@ -1,11 +1,11 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "OpenDemo script",
+  "title": "showem script",
   "type": "object",
   "properties": {
     "$schema": {
       "type": "string",
-      "description": "A JSON Schema for editors. Ignored by OpenDemo."
+      "description": "A JSON Schema for editors. Ignored by showem."
     },
     "url": {
       "type": "string",
@@ -99,7 +99,7 @@
       "properties": {
         "path": {
           "type": "string",
-          "description": "Where to write the video. `--out` on the command line overrides it. Default: the script's name with .mp4, or opendemo.mp4 for a script from stdin."
+          "description": "Where to write the video. `--out` on the command line overrides it. Default: the script's name with .mp4, or showem.mp4 for a script from stdin."
         },
         "width": {
           "type": "number",
@@ -180,7 +180,7 @@
         }
       },
       "additionalProperties": false,
-      "description": "How the video looks. Changing it only needs `opendemo render`."
+      "description": "How the video looks. Changing it only needs `showem render`."
     },
     "steps": {
       "type": "array",

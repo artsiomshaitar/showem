@@ -1,5 +1,7 @@
 #!/usr/bin/env bun
 import { join, resolve } from "node:path";
+import { version } from "../package.json";
+import { ensureTool } from "./deps.ts";
 import { actionDocs, overview } from "./docs.ts";
 import { loadScript, scriptJsonSchema } from "./format.ts";
 import { record } from "./record.ts";
@@ -9,23 +11,26 @@ import { screensOf } from "./script.ts";
 import { TRY_TIMEOUT_MS, tryScript } from "./try.ts";
 import type { Recording } from "./types.ts";
 
-const USAGE = `Usage: opendemo <command> <script> [--out <video.mp4>]
+const USAGE = `Usage: showem <command> <script> [--out <video.mp4>]
 
 <script> is a .yaml or .json file, or - to read the script from stdin.
 --out sets where the video goes (run, record, render, try), instead of the script's output.path.
-The recording is kept next to it in <video.mp4>.opendemo/, so render needs the same --out as run.
+The recording is kept next to it in <video.mp4>.showem/, so render needs the same --out as run.
 
 Commands:
   check    Check the script for mistakes without running anything
   try      Run the steps in a headless browser at full speed, without recording, skipping \`wait\` steps.
-           Stops at the first step that fails and saves a screenshot of each screen in <video.mp4>.opendemo/
+           Stops at the first step that fails and saves a screenshot of each screen in <video.mp4>.showem/
   run      Record the script in a headless browser, then render the video
   record   Only record (raw frames and event log)
   render   Only render, from an earlier recording
-  docs     Print the script format. \`opendemo docs <action>\` prints one action's fields
-  schema   Print the script format as JSON Schema, for editors`;
+  docs     Print the script format. \`showem docs <action>\` prints one action's fields
+  schema   Print the script format as JSON Schema, for editors
+  setup    Download the browser and ffmpeg into ~/.showem now, instead of on first use
 
-const COMMANDS = ["check", "try", "run", "record", "render", "docs", "schema"] as const;
+--version prints the version.`;
+
+const COMMANDS = ["check", "try", "run", "record", "render", "docs", "schema", "setup"] as const;
 type Command = (typeof COMMANDS)[number];
 const isCommand = (value: string | undefined): value is Command => COMMANDS.includes(value as Command);
 
@@ -50,6 +55,16 @@ if (command === "docs") {
   }
   process.exit(0);
 }
+if (command === "--version") {
+  console.log(version);
+  process.exit(0);
+}
+if (command === "setup") {
+  await ensureTool("chromium");
+  await ensureTool("ffmpeg");
+  console.log("Ready.");
+  process.exit(0);
+}
 if (command === "schema") {
   console.log(JSON.stringify(scriptJsonSchema(), null, 2));
   process.exit(0);
@@ -62,7 +77,7 @@ if (!isCommand(command) || !scriptArg) {
 const loaded = await loadScript(scriptArg);
 const { problems } = loaded;
 if (!("script" in loaded)) {
-  const docs = problems.some((p) => / step \d+ \(/.test(p)) ? "\nRun `opendemo docs <action>` for an action's fields and an example." : "";
+  const docs = problems.some((p) => / step \d+ \(/.test(p)) ? "\nRun `showem docs <action>` for an action's fields and an example." : "";
   (command === "check" ? console.log : console.error)(problems.join("\n") + docs);
   process.exit(1);
 }
@@ -72,7 +87,7 @@ if (command === "check") {
 }
 const { script } = loaded;
 const outPath = out ? resolve(out) : loaded.outPath;
-const workDir = `${outPath}.opendemo`;
+const workDir = `${outPath}.showem`;
 
 if (command === "try") {
   const { failed, shots } = await tryScript(script, workDir);

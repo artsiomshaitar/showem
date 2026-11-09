@@ -10,7 +10,7 @@ let dir: string;
 let rec: Recording;
 
 beforeAll(async () => {
-  dir = await mkdtemp(join(tmpdir(), "opendemo-zoom-"));
+  dir = await mkdtemp(join(tmpdir(), "showem-zoom-"));
   await Bun.write(join(dir, "page.html"), `<input id="name" style="position:absolute;left:40px;top:40px;width:120px"><button id="save" style="position:absolute;left:400px;top:300px">Save</button>`);
   const { script } = resolveScript(
     {

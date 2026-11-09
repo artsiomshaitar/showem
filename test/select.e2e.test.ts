@@ -25,7 +25,7 @@ const scriptOf = (steps: Step[]): Script =>
   resolveScript({ url: "./page.html", viewport: { width: 640, height: 400 }, deviceScaleFactor: 1, steps }, join(dir, "demo.yaml")).script;
 
 beforeAll(async () => {
-  dir = await mkdtemp(join(tmpdir(), "opendemo-select-"));
+  dir = await mkdtemp(join(tmpdir(), "showem-select-"));
   page = join(dir, "page.html");
   await Bun.write(page, PAGE);
   rec = await record(

@@ -21,7 +21,7 @@ steps:
 
   - action: type
     target: "#new"
-    text: Record a demo with OpenDemo
+    text: Record a demo with showem
     zoom: true
     caption: Type a new task
 
