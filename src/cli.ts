@@ -4,6 +4,7 @@ import { actionDocs, overview } from "./docs.ts";
 import { loadScript, scriptJsonSchema } from "./format.ts";
 import { record } from "./record.ts";
 import { render } from "./render.ts";
+import { RENDER_WORKER_COMMAND, runRenderWorker } from "./render-worker.ts";
 import { screensOf } from "./script.ts";
 import { TRY_TIMEOUT_MS, tryScript } from "./try.ts";
 import type { Recording } from "./types.ts";
@@ -36,6 +37,10 @@ if (outAt !== -1 && !out) {
   process.exit(1);
 }
 const [command, scriptArg] = args;
+if (command === RENDER_WORKER_COMMAND) {
+  await runRenderWorker(scriptArg);
+  process.exit(0);
+}
 if (command === "docs") {
   try {
     console.log(scriptArg ? actionDocs(scriptArg) : overview());

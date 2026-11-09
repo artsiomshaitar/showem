@@ -36,3 +36,6 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # opendemo work dirs
 *.opendemo/
 *.mp4
+
+# personal Claude Code skills
+.claude/skills/

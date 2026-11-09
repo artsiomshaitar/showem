@@ -3,10 +3,15 @@ import { join } from "node:path";
 import { concatVideos, expectSuccess } from "./ffmpeg.ts";
 import type { FrameJob } from "./frames.ts";
 import { assertRecordingMatches } from "./plan.ts";
+import { RENDER_WORKER_COMMAND } from "./render-worker.ts";
 import { outputOf } from "./script.ts";
 import type { Recording, Script } from "./types.ts";
 
 const MIN_FRAMES_PER_WORKER = 60;
+
+/** A compiled binary has no source files on disk, so it runs itself with a hidden command instead. */
+const isCompiled = import.meta.dir.startsWith("/$bunfs/");
+const workerCommand = isCompiled ? [process.execPath, RENDER_WORKER_COMMAND] : ["bun", join(import.meta.dir, "render-worker.ts")];
 
 export function frameCount(script: Script, rec: Recording) {
   return Math.ceil((rec.duration / 1000) * outputOf(script).fps);
@@ -35,7 +40,7 @@ export async function render(script: Script, rec: Recording, dir: string, outPat
   const workers = await Promise.all(jobs.map(async (job, k) => {
     const jobPath = join(partsDir, `${k}.json`);
     await Bun.write(jobPath, JSON.stringify(job));
-    return Bun.spawn(["bun", join(import.meta.dir, "render-worker.ts"), jobPath], { stdout: "pipe", stderr: "inherit" });
+    return Bun.spawn([...workerCommand, jobPath], { stdout: "pipe", stderr: "inherit" });
   }));
 
   let done = 0;
