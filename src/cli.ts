@@ -28,7 +28,7 @@ Commands:
   schema   Print the script format as JSON Schema, for editors
   setup    Download the browser and ffmpeg into ~/.showem now, instead of on first use
 
---version prints the version.`;
+-v, --version prints the version. -h, --help prints this help.`;
 
 const COMMANDS = ["check", "try", "run", "record", "render", "docs", "schema", "setup"] as const;
 type Command = (typeof COMMANDS)[number];
@@ -46,6 +46,10 @@ if (command === RENDER_WORKER_COMMAND) {
   await runRenderWorker(scriptArg);
   process.exit(0);
 }
+if (command === "--help" || command === "-h") {
+  console.log(USAGE);
+  process.exit(0);
+}
 if (command === "docs") {
   try {
     console.log(scriptArg ? actionDocs(scriptArg) : overview());
@@ -55,7 +59,7 @@ if (command === "docs") {
   }
   process.exit(0);
 }
-if (command === "--version") {
+if (command === "--version" || command === "-v") {
   console.log(version);
   process.exit(0);
 }

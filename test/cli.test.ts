@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { version } from "../package.json";
 
 function cli(args: string[], stdin: string) {
   const proc = Bun.spawnSync(["bun", "src/cli.ts", ...args], { stdin: new TextEncoder().encode(stdin) });
@@ -33,4 +34,11 @@ test("check reports a step with a missing field instead of crashing", () => {
 test("--out needs a path", () => {
   expect(cli(["check", "-", "--out"], "url: http://x\nsteps: []\n").code).toBe(1);
   expect(cli(["check", "-", "--out", "a.mp4"], "url: http://x\nsteps: []\n")).toEqual({ code: 0, out: "OK" });
+});
+
+test("-v prints the version and -h prints the help", () => {
+  expect(cli(["-v"], "")).toEqual({ code: 0, out: version });
+  expect(cli(["--version"], "")).toEqual({ code: 0, out: version });
+  expect(cli(["-h"], "").out).toStartWith("Usage: showem");
+  expect(cli(["--help"], "").code).toBe(0);
 });
