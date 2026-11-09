@@ -1,6 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { chromium } from "playwright-core";
+import { ensureTool } from "./deps.ts";
 import { Director, openScreens } from "./record.ts";
 import { fillStep } from "./script.ts";
 import type { Script } from "./types.ts";
@@ -20,7 +21,7 @@ export interface TryResult {
  * `wait` steps are skipped: they give viewers time to look, and there are no viewers here.
  */
 export async function tryScript(script: Script, dir: string): Promise<TryResult> {
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({ executablePath: await ensureTool("chromium"), headless: true });
   try {
     const screens = await openScreens(browser, script, 1);
     const directors = new Map(

@@ -45,6 +45,6 @@ test("an action's docs list its fields, the caption, and an example", () => {
 });
 
 test("the skill names every action", async () => {
-  const skill = await Bun.file("skill/opendemo/SKILL.md").text();
+  const skill = await Bun.file("skill/showem/SKILL.md").text();
   expect(Object.keys(ACTIONS).filter((name) => !skill.includes(`\`${name}\``))).toEqual([]);
 });

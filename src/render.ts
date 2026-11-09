@@ -1,5 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
+import { ensureTool } from "./deps.ts";
 import { concatVideos, expectSuccess } from "./ffmpeg.ts";
 import type { FrameJob } from "./frames.ts";
 import { assertRecordingMatches } from "./plan.ts";
@@ -31,6 +32,7 @@ export function splitFrames(total: number, parts: number): [number, number][] {
  */
 export async function render(script: Script, rec: Recording, dir: string, outPath: string, onProgress?: (done: number, total: number) => void) {
   assertRecordingMatches(script, rec);
+  await ensureTool("ffmpeg");
   const total = frameCount(script, rec);
   const ranges = splitFrames(total, Math.min(navigator.hardwareConcurrency - 1, Math.ceil(total / MIN_FRAMES_PER_WORKER)));
   const partsDir = join(dir, "parts");

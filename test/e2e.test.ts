@@ -13,7 +13,7 @@ let outPath: string;
 let rec: Recording;
 
 beforeAll(async () => {
-  dir = await mkdtemp(join(tmpdir(), "opendemo-e2e-"));
+  dir = await mkdtemp(join(tmpdir(), "showem-e2e-"));
   await Bun.write(join(dir, "start.html"), `<a href="./form.html">Next</a>`);
   await Bun.write(
     join(dir, "form.html"),
@@ -86,5 +86,5 @@ test("renders a video with one frame per output tick", async () => {
 
 test("refuses to render after the steps changed", () => {
   const changed = { ...script, steps: script.steps.slice(1) };
-  expect(render(changed, rec, join(dir, "work"), outPath)).rejects.toThrow(/opendemo run/);
+  expect(render(changed, rec, join(dir, "work"), outPath)).rejects.toThrow(/showem run/);
 });

@@ -1,4 +1,5 @@
 import type { Subprocess } from "bun";
+import { toolPath } from "./deps.ts";
 import type { Size } from "./types.ts";
 
 export async function expectSuccess(proc: Subprocess, what: string) {
@@ -10,7 +11,7 @@ export async function expectSuccess(proc: Subprocess, what: string) {
 export function startEncoder(outPath: string, size: Size, fps: number) {
   const proc = Bun.spawn(
     [
-      "ffmpeg", "-y", "-loglevel", "error",
+      toolPath("ffmpeg"), "-y", "-loglevel", "error",
       "-f", "rawvideo", "-pix_fmt", "rgba", "-s", `${size.width}x${size.height}`, "-r", String(fps), "-i", "-",
       "-c:v", "libx264", "-preset", "veryfast", "-crf", "16", "-pix_fmt", "yuv420p",
       outPath,
@@ -37,7 +38,7 @@ export function concatList(paths: readonly string[]) {
 export async function concatVideos(parts: readonly string[], listPath: string, outPath: string) {
   await Bun.write(listPath, concatList(parts));
   const proc = Bun.spawn(
-    ["ffmpeg", "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", listPath, "-c", "copy", "-movflags", "+faststart", outPath],
+    [toolPath("ffmpeg"), "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", listPath, "-c", "copy", "-movflags", "+faststart", outPath],
     { stdout: "inherit", stderr: "inherit" },
   );
   await expectSuccess(proc, "ffmpeg concat");

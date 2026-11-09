@@ -33,8 +33,8 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # Finder (MacOS) folder config
 .DS_Store
 
-# opendemo work dirs
-*.opendemo/
+# showem work dirs
+*.showem/
 *.mp4
 
 # personal Claude Code skills

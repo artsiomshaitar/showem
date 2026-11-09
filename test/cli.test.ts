@@ -12,7 +12,7 @@ test("check reads a script from stdin and prints OK", () => {
 test("check exits with an error and lists every problem", () => {
   expect(cli(["check", "-"], "url: http://x\nsteps:\n  - action: wait\n    ms: 1\n    caption: 2\n  - action: goto\n    url: '${a}'\n")).toEqual({
     code: 1,
-    out: ['<stdin>:5 step 1 (wait): "caption" must be text, not 2. Put quotes around it: "2"', '<stdin>:6 step 2 (goto): "${a}" is used before it\'s saved. Add a `save` step with `as: a` before this step', "2 errors", "Run `opendemo docs <action>` for an action's fields and an example."].join("\n"),
+    out: ['<stdin>:5 step 1 (wait): "caption" must be text, not 2. Put quotes around it: "2"', '<stdin>:6 step 2 (goto): "${a}" is used before it\'s saved. Add a `save` step with `as: a` before this step', "2 errors", "Run `showem docs <action>` for an action's fields and an example."].join("\n"),
   });
 });
 
@@ -21,7 +21,7 @@ test("run stops before recording when the script has problems", () => {
 });
 
 test("docs prints the format, one action, or an error with a suggestion", () => {
-  expect(cli(["docs"], "").out).toContain("Run `opendemo docs <action>`");
+  expect(cli(["docs"], "").out).toContain("Run `showem docs <action>`");
   expect(cli(["docs", "click"], "").out).toStartWith("click: ");
   expect(cli(["docs", "clik"], "").code).toBe(1);
 });

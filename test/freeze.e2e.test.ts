@@ -13,7 +13,7 @@ let outPath: string;
 let rec: Recording;
 
 beforeAll(async () => {
-  dir = await mkdtemp(join(tmpdir(), "opendemo-freeze-"));
+  dir = await mkdtemp(join(tmpdir(), "showem-freeze-"));
   await Bun.write(
     join(dir, "admin.html"),
     `<style>html, body { height: 100%; margin: 0; background: #fff }</style>

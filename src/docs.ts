@@ -78,7 +78,7 @@ steps:
 export function overview() {
   const width = Math.max(...Object.keys(ACTIONS).map((name) => name.length));
   const actions = Object.entries(ACTIONS).map(([name, spec]) => `  ${name.padEnd(width)}  ${spec.doc.split(". ")[0]!.replace(/\.$/, "")}.`);
-  return `An OpenDemo script is YAML (or JSON) with these fields:
+  return `A showem script is YAML (or JSON) with these fields:
 
 ${table([...rows(TOP).filter((r) => r.name !== "$schema"), { name: "steps", type: "list of steps", required: true, doc: "What happens, in order." }])}
 
@@ -90,7 +90,7 @@ ${actions.join("\n")}
 Example:
 ${indent(EXAMPLE)}
 
-Run \`opendemo docs <action>\` for an action's fields and an example.`;
+Run \`showem docs <action>\` for an action's fields and an example.`;
 }
 
 /** One action: what it does, its fields and an example. */

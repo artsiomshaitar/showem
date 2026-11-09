@@ -185,6 +185,6 @@ steps:
   });
 });
 
-test("the JSON Schema file is up to date (bun src/cli.ts schema > opendemo.schema.json)", async () => {
-  expect(await Bun.file("opendemo.schema.json").json()).toEqual(JSON.parse(JSON.stringify(scriptJsonSchema())));
+test("the JSON Schema file is up to date (bun src/cli.ts schema > showem.schema.json)", async () => {
+  expect(await Bun.file("showem.schema.json").json()).toEqual(JSON.parse(JSON.stringify(scriptJsonSchema())));
 });

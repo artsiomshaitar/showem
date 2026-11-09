@@ -12,7 +12,7 @@ test("the concat list escapes single quotes", () => {
 });
 
 test("encodes frames and joins parts, even with a quote in the path", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "opendemo John's "));
+  const dir = await mkdtemp(join(tmpdir(), "showem John's "));
   dirs.push(dir);
   const size = { width: 64, height: 32 };
   const parts = [join(dir, "0.mp4"), join(dir, "1.mp4")];
