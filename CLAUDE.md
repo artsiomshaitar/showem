@@ -7,7 +7,7 @@ showem turns a YAML (or JSON) step script into a demo video: it runs the script 
 ## Commands
 
 ```sh
-bun test                         # all tests (~80s, some launch Chromium and ffmpeg)
+bun test --parallel              # all tests (~35s, some launch Chromium and ffmpeg)
 bun test test/plan.test.ts       # one file
 bun run typecheck
 bun src/cli.ts check <script.yaml>   # check a script without running it

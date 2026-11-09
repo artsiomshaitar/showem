@@ -3,6 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { concatList, concatVideos, startEncoder } from "../src/ffmpeg.ts";
+import { probeVideo } from "./fixtures.ts";
 
 const dirs: string[] = [];
 afterAll(() => Promise.all(dirs.map((d) => rm(d, { recursive: true, force: true }))));
@@ -23,6 +24,5 @@ test("encodes frames and joins parts, even with a quote in the path", async () =
   }
   const out = join(dir, "out.mp4");
   await concatVideos(parts, join(dir, "list.txt"), out);
-  const probe = Bun.spawnSync(["ffprobe", "-v", "error", "-count_frames", "-show_entries", "stream=nb_read_frames", "-of", "csv=p=0", out]);
-  expect(probe.stdout.toString().trim()).toBe("6");
+  expect(probeVideo(out)).toBe(`${size.width},${size.height},6`);
 });

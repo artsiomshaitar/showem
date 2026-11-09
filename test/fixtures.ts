@@ -1,3 +1,4 @@
+import { toolPath } from "../src/deps.ts";
 import { recordingKey } from "../src/script.ts";
 import type { Recording, Script, ScreenRecording } from "../src/types.ts";
 
@@ -31,4 +32,12 @@ export function makeRecording(script: Script, overrides: Partial<Recording> = {}
     vars: {},
     ...overrides,
   };
+}
+
+/** "width,height,frames" of the video's first stream, counted by decoding it with the ffmpeg showem uses. */
+export function probeVideo(path: string) {
+  const log = Bun.spawnSync([toolPath("ffmpeg"), "-hide_banner", "-i", path, "-map", "0:v:0", "-f", "null", "-"]).stderr.toString();
+  const [, width, height] = log.match(/Video: .*?, (\d+)x(\d+)/) ?? [];
+  const frames = [...log.matchAll(/frame=\s*(\d+)/g)].at(-1)?.[1];
+  return `${width},${height},${frames}`;
 }

@@ -2,6 +2,7 @@ import { afterAll, beforeAll, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { toolPath } from "../src/deps.ts";
 import { record } from "../src/record.ts";
 import { render } from "../src/render.ts";
 import { resolveScript } from "../src/script.ts";
@@ -48,7 +49,7 @@ afterAll(() => rm(dir, { recursive: true, force: true }));
 /** The color at the middle of the video at `ms`. */
 function centerAt(ms: number) {
   const out = Bun.spawnSync([
-    "ffmpeg", "-v", "error", "-ss", String(ms / 1000), "-i", outPath,
+    toolPath("ffmpeg"), "-v", "error", "-ss", String(ms / 1000), "-i", outPath,
     "-vf", "crop=8:8:(iw-8)/2:(ih-8)/2,scale=1:1", "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-",
   ]).stdout;
   return { r: out[0]!, g: out[1]!, b: out[2]! };

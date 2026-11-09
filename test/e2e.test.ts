@@ -6,6 +6,7 @@ import { record } from "../src/record.ts";
 import { frameCount, render } from "../src/render.ts";
 import { resolveScript } from "../src/script.ts";
 import type { Recording, Script } from "../src/types.ts";
+import { probeVideo } from "./fixtures.ts";
 
 let dir: string;
 let script: Script;
@@ -80,8 +81,7 @@ test("leaves paused steps out of the recording", () => {
 
 test("renders a video with one frame per output tick", async () => {
   await render(script, rec, join(dir, "work"), outPath);
-  const probe = Bun.spawnSync(["ffprobe", "-v", "error", "-count_frames", "-show_entries", "stream=nb_read_frames,width,height", "-of", "csv=p=0", outPath]);
-  expect(probe.stdout.toString().trim()).toBe(`480,270,${frameCount(script, rec)}`);
+  expect(probeVideo(outPath)).toBe(`480,270,${frameCount(script, rec)}`);
 }, 60_000);
 
 test("refuses to render after the steps changed", () => {

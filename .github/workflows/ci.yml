@@ -18,7 +18,5 @@ jobs:
         with:
           path: ~/.showem
           key: showem-tools-${{ runner.arch }}-${{ hashFiles('src/deps.ts') }}
-      # The tests check videos with ffprobe.
-      - run: brew install ffmpeg
       - run: bun run typecheck
-      - run: bun test
+      - run: bun test --parallel
