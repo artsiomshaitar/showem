@@ -1,31 +1,30 @@
 # showem
 
-Screen studio for your agent.
-
-Your agent writes a short script. showem plays it in a headless browser and turns it into a polished video with zooms, a smooth cursor and captions. It never touches your screen.
+Screen studio for your agent. Ask it for a demo, and showem turns a short script into a polished video.
 
 https://github.com/user-attachments/assets/46d9736a-29d2-4695-ad68-f77766854112
 
+## How it works
+
+- your agent writes a short script: click this, type that, zoom in here
+- showem plays it in a headless browser, so your screen and mouse stay yours
+- then it adds zooms, a smooth cursor, captions and a browser or phone frame, and saves an MP4
+- the first run downloads Chromium and ffmpeg into `~/.showem`
+
 ## Install
+
+macOS only for now.
 
 ```sh
 curl -fsSL https://showem.shaitar.com/install.sh | sh
 ```
 
-Or with Homebrew:
+Or install with:
 
-```sh
-brew install artsiomshaitar/tap/showem
-```
+- Homebrew: `brew install artsiomshaitar/tap/showem`
+- a binary for [Apple silicon](https://github.com/artsiomshaitar/showem/releases/latest/download/showem-darwin-arm64.tar.gz) or [Intel](https://github.com/artsiomshaitar/showem/releases/latest/download/showem-darwin-x64.tar.gz)
 
-macOS only for now. The first run downloads Chromium and ffmpeg into `~/.showem`.
-
-Homebrew sets up tab completion for you. With the install script, add this to your shell config:
-
-```sh
-source <(showem completion zsh)    # ~/.zshrc
-source <(showem completion bash)   # ~/.bashrc
-```
+Homebrew sets up tab completion. Otherwise add `source <(showem completion zsh)` to `~/.zshrc`, or `source <(showem completion bash)` to `~/.bashrc`.
 
 ## Give it to your agent
 
@@ -50,7 +49,7 @@ steps:
 showem run demo.yaml
 ```
 
-`showem docs` lists every action. For autocomplete in your editor, add this line at the top of the script:
+`showem docs` lists every action, and [`skill/showem/SKILL.md`](skill/showem/SKILL.md) is the full script format. For autocomplete in your editor, add this line at the top of the script:
 
 ```yaml
 # yaml-language-server: $schema=https://showem.shaitar.com/schema.json
@@ -64,6 +63,4 @@ bun test
 bun src/cli.ts run examples/todo.demo.yaml
 ```
 
-## License
-
-MIT
+MIT licensed.
