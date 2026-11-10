@@ -28,6 +28,7 @@ console.log(`class Showem < Formula
 
   def install
     bin.install "showem"
+    generate_completions_from_executable(bin/"showem", "completion", shells: [:bash, :zsh])
   end
 
   def caveats

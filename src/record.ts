@@ -8,7 +8,7 @@ import { center, union } from "./geometry.ts";
 import { menuLayout, rowBox } from "./menu.ts";
 import { cursorPath, TRANSITION_MS, travelMs } from "./motion.ts";
 import { fillStep, isPhone, NOTICE_MS, pausesOf, readingMs, recordingKey, screensOf, styleOf, type Pause } from "./script.ts";
-import type { Box, Frame, Point, Recording, Sample, Script, ScreenRecording, Size, Step, StepLog, Switch } from "./types.ts";
+import type { Box, Frame, Point, Recording, Sample, Script, ScreenRecording, Size, Stall, Step, StepLog, Switch } from "./types.ts";
 
 const DEFAULT_SCALE_FACTOR = 3;
 const JPEG_QUALITY = 98;
@@ -35,6 +35,10 @@ const MENU_OPEN_MS = 350;
 const MENU_PICK_MS = 200;
 /** How long the result of a captioned step stays on screen before the next step starts. */
 const CAPTION_HOLD_MS = 600;
+/** A gap between two animation frames longer than this means the browser stopped drawing for a moment. */
+const STALL_MS = 100;
+/** With no screencast frame during such a gap, one this soon after it means the page changed meanwhile: the video jumps there. */
+const STALL_FRAME_MS = 50;
 
 type SaveStep = Extract<Step, { action: "save" }>;
 type SelectStep = Extract<Step, { action: "select" }>;
@@ -135,6 +139,19 @@ async function openOption(page: Page, step: SelectStep, open: () => Promise<void
   return matches.last();
 }
 
+/** Runs in every page and reports each long gap between its animation frames, with the wall-clock time it ended. */
+function watchForStalls(stallMs: number) {
+  // Iframes are left out: a hidden one can be throttled while the page itself draws fine.
+  if (window !== window.top) return;
+  let last = performance.now();
+  const tick = (now: number) => {
+    if (now - last > stallMs) (window as unknown as { __showemStall(end: number, ms: number): void }).__showemStall(performance.timeOrigin + now, now - last);
+    last = now;
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
 /** Recording time: time since the start, leaving out the stretches when recording was paused. */
 class Clock {
   readonly t0 = Date.now();
@@ -143,12 +160,20 @@ class Clock {
   readonly now = () => this.at(Date.now());
 
   /** The recording time of a wall-clock time. Anything during a pause is at the moment the pause began. */
+  private pauseAt(wall: number) {
+    return this.pauses.find((p) => wall >= p.start && wall < p.end);
+  }
+
   at(wall: number) {
     // Exactly the pause's own start, so frames during a pause and `now()` while paused agree to the last digit.
-    wall = this.pauses.find((p) => wall >= p.start && wall < p.end)?.start ?? wall;
+    wall = this.pauseAt(wall)?.start ?? wall;
     let t = wall - this.t0;
     for (const p of this.pauses) t -= Math.max(0, Math.min(wall, p.end) - p.start);
     return t;
+  }
+
+  isPaused(wall: number) {
+    return this.pauseAt(wall) !== undefined;
   }
 
   get paused() {
@@ -483,8 +508,11 @@ export class Director {
   }
 }
 
-/** Opens every screen on its first page, each in its own context, so each has its own cookies and login. */
-export function openScreens(browser: Browser, script: Script, scaleFactor: number) {
+/**
+ * Opens every screen on its first page, each in its own context, so each has its own cookies and login.
+ * `onStall` gets every moment a page stopped drawing: when it ended (wall clock) and for how long.
+ */
+export function openScreens(browser: Browser, script: Script, scaleFactor: number, onStall?: (screen: string, end: number, ms: number) => void) {
   return Promise.all(
     Object.entries(screensOf(script)).map(async ([name, screen]) => {
       const phone = isPhone(screen.frame);
@@ -494,6 +522,10 @@ export function openScreens(browser: Browser, script: Script, scaleFactor: numbe
         ...(phone && { isMobile: true, hasTouch: true, userAgent: devices["iPhone 15 Pro"]?.userAgent }),
       });
       await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+      if (onStall) {
+        await context.exposeBinding("__showemStall", (_, end: number, ms: number) => onStall(name, end, ms));
+        await context.addInitScript(watchForStalls, STALL_MS);
+      }
       const page = await context.newPage();
       await page.goto(screen.url, { waitUntil: "load" });
       return { name, screen, context, page, phone };
@@ -510,7 +542,8 @@ export async function record(script: Script, dir: string): Promise<Recording> {
   // Without the GPU, headless Chromium redraws effects like a blurred backdrop on the CPU, and at 3x it films about 5 frames a second.
   const browser = await chromium.launch({ executablePath: await ensureTool("chromium"), headless: true, args: [`--force-device-scale-factor=${scaleFactor}`, "--enable-gpu"] });
   try {
-    const screens = await openScreens(browser, script, scaleFactor);
+    const pageStalls: { screen: string; end: number; ms: number }[] = [];
+    const screens = await openScreens(browser, script, scaleFactor, (screen, end, ms) => pageStalls.push({ screen, end, ms }));
     for (const { name } of screens) await mkdir(join(framesDir, name), { recursive: true });
 
     const clock = new Clock();
@@ -644,6 +677,19 @@ export async function record(script: Script, dir: string): Promise<Recording> {
     const duration = now();
     await Promise.all(live.map((s) => s.cdp.send("Page.stopScreencast")));
     await Promise.all(writes);
+    const stalls: Stall[] = [];
+    for (const { screen, end, ms } of pageStalls) {
+      const start = end - ms;
+      if (clock.isPaused(start) || clock.isPaused(end)) continue;
+      const frames = live.find((s) => s.name === screen)!.frames;
+      // Only a gap the video shows: no frame while the page wasn't drawing (the one it drew last can land just after
+      // the gap starts), then one as soon as it drew again.
+      const filmed = frames.some((f) => f.t > start + STALL_FRAME_MS && f.t < end);
+      if (filmed || !frames.some((f) => f.t >= end && f.t <= end + STALL_FRAME_MS)) continue;
+      const t = clock.at(start);
+      const step = steps.find((l) => l.screen === screen && t >= l.start && t <= l.end);
+      if (step) stalls.push({ screen, step: step.index, t, ms: Math.round(ms) });
+    }
     for (const s of live) for (const f of s.frames) f.t = Math.max(0, clock.at(f.t));
 
     const recording: Recording = {
@@ -659,6 +705,7 @@ export async function record(script: Script, dir: string): Promise<Recording> {
       switches,
       steps,
       vars,
+      ...(stalls.length && { stalls }),
     };
     await Bun.write(join(dir, "recording.json"), JSON.stringify(recording, null, 2));
     return recording;

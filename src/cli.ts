@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { join, resolve } from "node:path";
 import { version } from "../package.json";
+import { completion, isShell, SHELLS } from "./completion.ts";
 import { ensureTool } from "./deps.ts";
 import { actionDocs, overview } from "./docs.ts";
 import { loadScript, scriptJsonSchema } from "./format.ts";
@@ -27,6 +28,8 @@ Commands:
   docs     Print the script format. \`showem docs <action>\` prints one action's fields
   schema   Print the script format as JSON Schema, for editors
   setup    Download the browser and ffmpeg into ~/.showem now, instead of on first use
+  completion zsh|bash
+           Print the shell script for tab completion
 
 -v, --version prints the version. -h, --help prints this help.`;
 
@@ -57,6 +60,14 @@ if (command === "docs") {
     console.error((error as Error).message);
     process.exit(1);
   }
+  process.exit(0);
+}
+if (command === "completion") {
+  if (!isShell(scriptArg)) {
+    console.error(`Usage: showem completion ${SHELLS.join("|")}`);
+    process.exit(1);
+  }
+  process.stdout.write(completion(scriptArg, [...COMMANDS, "completion"]));
   process.exit(0);
 }
 if (command === "--version" || command === "-v") {
@@ -113,6 +124,9 @@ if (command === "render") {
   console.error(`Recording ${Object.values(screensOf(script)).map((s) => s.url).join(", ")}`);
   rec = await record(script, workDir);
   console.error(`Recorded ${(rec.duration / 1000).toFixed(1)}s, ${Object.values(rec.screens).reduce((n, s) => n + s.frames.length, 0)} frames`);
+  for (const stall of rec.stalls ?? []) {
+    console.error(`${loaded.stepAt(stall.step)}: the browser stopped drawing for ${stall.ms} ms at ${(stall.t / 1000).toFixed(1)}s, so the video jumps there. If the page isn't busy there on every run, record again.`);
+  }
 }
 
 if (command !== "record") {

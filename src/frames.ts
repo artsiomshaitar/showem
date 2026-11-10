@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { createCanvas, loadImage, type Canvas, type Image, type SKRSContext2D } from "@napi-rs/canvas";
+import { createCanvas, loadImage, type Canvas, type Image, type ImageData, type SKRSContext2D } from "@napi-rs/canvas";
 import type { Camera } from "./camera.ts";
 import { drawBackground, drawCaption, drawChrome, drawCursor, drawMenu, drawOverlay, drawPhoneBody, drawShadow, drawTap, roundedBox } from "./draw.ts";
 import { startEncoder } from "./ffmpeg.ts";
@@ -95,6 +95,21 @@ function blurTaps(plan: ScreenPlan, layout: Layout, t: number, shutterMs: number
     Math.hypot(cam.cx - before.cx, cam.cy - before.cy) * layout.page.width * cam.scale;
   const cursorPx = plan.touch ? 0 : Math.hypot(a.x - b.x, a.y - b.y) * layout.fit * cam.scale;
   return { taps: Math.min(maxTaps, Math.max(1, Math.ceil(Math.max(cameraPx, cursorPx) / BLUR_PX_PER_TAP))), cameraPx };
+}
+
+/**
+ * Motion blur averages sub-frames by adding up their bytes. Blending them with `globalAlpha` instead rounds down
+ * a little on every draw, which darkens the blended area by a few shades: on a dark page, a visible box.
+ */
+export function addPixels(sum: Uint16Array, data: Uint8ClampedArray) {
+  for (let i = 0; i < data.length; i++) sum[i]! += data[i]!;
+}
+
+export function averagePixels(sum: Uint16Array, count: number, out: ImageData) {
+  const { data } = out;
+  const half = count >> 1;
+  for (let i = 0; i < data.length; i++) data[i] = ((sum[i]! + half) / count) | 0;
+  return out;
 }
 
 type Change = Exclude<Scene, { screen: string }>;
@@ -219,17 +234,16 @@ export async function renderFrames(job: FrameJob, onFrame?: () => void) {
     const w = Math.min(width, Math.ceil(Math.max(...tips.map((p) => p.x)) + margin)) - x;
     const h = Math.min(height, Math.ceil(Math.max(...tips.map((p) => p.y)) + margin)) - y;
     if (w <= 0 || h <= 0) return;
+    const sum = sumBuffer(w * h * 4);
     for (let k = 0; k < taps; k++) {
-      patchCtx.globalAlpha = 1;
       patchCtx.drawImage(scene, x, y, w, h, x, y, w, h);
       patchCtx.save();
       applyCamera(patchCtx, screen.layout, cam);
       drawPointer(patchCtx, name, times[k]!, 1);
       patchCtx.restore();
-      outCtx.globalAlpha = 1 / (k + 1);
-      outCtx.drawImage(patch, x, y, w, h, x, y, w, h);
+      addPixels(sum, patchCtx.getImageData(x, y, w, h).data);
     }
-    outCtx.globalAlpha = 1;
+    outCtx.putImageData(averagePixels(sum, taps, outCtx.createImageData(w, h)), x, y);
   }
 
   /** How far the outgoing and incoming windows are moved sideways during a slide. */
@@ -261,15 +275,26 @@ export async function renderFrames(job: FrameJob, onFrame?: () => void) {
   const shutterMs = style.motionBlur * frameMs * 2;
   const maxTaps = 1 + Math.round(style.motionBlur * (MAX_BLUR_TAPS - 1));
 
+  let sums: Uint16Array | undefined;
+  let averageFrame: ImageData | undefined;
+  /** A zeroed buffer for adding up `length` sub-frame bytes, reused between frames. */
+  function sumBuffer(length: number) {
+    if (!sums || sums.length < length) sums = new Uint16Array(length);
+    const sum = sums.subarray(0, length);
+    sum.fill(0);
+    return sum;
+  }
+
   /** Blends `taps` sub-frames across the shutter into `outCtx`, or draws one frame straight into it. */
   async function blend(t: number, taps: number, draw: (ctx: SKRSContext2D, t: number) => Promise<void>) {
     if (taps === 1) return draw(outCtx, t);
+    const sum = sumBuffer(width * height * 4);
     for (let k = 0; k < taps; k++) {
       await draw(sceneCtx, t - shutterMs * (1 - k / (taps - 1)));
-      outCtx.globalAlpha = 1 / (k + 1);
-      outCtx.drawImage(scene, 0, 0);
+      addPixels(sum, sceneCtx.getImageData(0, 0, width, height).data);
     }
-    outCtx.globalAlpha = 1;
+    averageFrame ??= outCtx.createImageData(width, height);
+    outCtx.putImageData(averagePixels(sum, taps, averageFrame), 0, 0);
   }
 
   for (let i = job.from; i < job.to; i++) {

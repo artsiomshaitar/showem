@@ -1,0 +1,706 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Members · Acme</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --g-950: #09090b;
+    --g-925: #0d0d10;
+    --g-900: #121215;
+    --g-850: #18181c;
+    --g-800: #212126;
+    --g-700: #313138;
+    --g-600: #4b4b54;
+    --g-500: #6e6e78;
+    --g-400: #9c9ca6;
+    --g-300: #c3c3cb;
+    --g-200: #dfdfe5;
+    --g-100: #f4f4f6;
+
+    --text-1: var(--g-100);
+    --text-2: var(--g-400);
+    --text-3: var(--g-500);
+
+    --iris-400: #9590ff;
+    --green-400: #4ade80;
+
+    --line: rgba(244, 244, 246, 0.07);
+    --line-strong: rgba(244, 244, 246, 0.11);
+    --hover: rgba(244, 244, 246, 0.035);
+
+    --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 24px;
+    --s-6: 32px; --s-7: 48px; --s-8: 64px;
+
+    --t-xs: 12px; --t-sm: 13px; --t-md: 14px; --t-lg: 16px; --t-xl: 20px; --t-2xl: 26px;
+
+    --r-sm: 6px; --r-md: 8px; --r-lg: 12px;
+
+    --e-1: 0 1px 2px rgba(0,0,0,.5);
+    --e-4: 0 0 0 1px var(--line-strong), inset 0 1px 0 rgba(255,255,255,.05), 0 32px 80px -16px rgba(0,0,0,.8);
+
+    --font: "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--g-950);
+    color: var(--text-1);
+    font-family: var(--font);
+    font-size: var(--t-md);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, p { margin: 0; }
+  ul { margin: 0; padding: 0; list-style: none; }
+  a { color: inherit; text-decoration: none; }
+  button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+  input { font: inherit; color: inherit; }
+  svg { display: block; flex: none; }
+  :focus-visible { outline: 2px solid var(--iris-400); outline-offset: 2px; }
+
+  .app { display: grid; grid-template-columns: 232px 1fr; height: 100vh; }
+
+  /* Sidebar */
+  .sidebar {
+    display: flex; flex-direction: column;
+    padding: var(--s-3);
+    background: var(--g-925);
+    border-right: 1px solid var(--line);
+  }
+  .workspace {
+    display: flex; align-items: center; gap: var(--s-3);
+    padding: var(--s-2);
+    border-radius: var(--r-md);
+  }
+  .logo {
+    width: 28px; height: 28px; border-radius: 7px;
+    display: grid; place-items: center;
+    background: linear-gradient(145deg, var(--g-100), var(--g-400));
+    color: var(--g-950);
+    box-shadow: inset 0 1px 0 #fff, var(--e-1);
+  }
+  .workspace strong { display: block; font-size: var(--t-md); font-weight: 500; line-height: 1.2; }
+  .workspace span { font-size: var(--t-xs); color: var(--text-3); }
+  .workspace .chev { margin-left: auto; color: var(--text-3); }
+
+  .nav { margin-top: var(--s-5); display: flex; flex-direction: column; gap: 2px; }
+  .nav-label {
+    padding: 0 var(--s-2); margin: var(--s-5) 0 var(--s-2);
+    font-size: var(--t-xs); color: var(--text-3);
+  }
+  .nav a {
+    display: flex; align-items: center; gap: var(--s-3);
+    height: 32px; padding: 0 var(--s-2);
+    border-radius: var(--r-sm);
+    font-size: var(--t-md); color: var(--text-2);
+  }
+  .nav a svg { color: var(--text-3); }
+  .nav a:hover { background: var(--hover); color: var(--text-1); }
+  .nav a.active { background: rgba(244,244,246,.06); color: var(--text-1); }
+  .nav a.active svg { color: var(--text-1); }
+
+  .me {
+    margin-top: auto;
+    display: flex; align-items: center; gap: var(--s-3);
+    padding: var(--s-2);
+  }
+  .me strong { display: block; font-size: var(--t-sm); font-weight: 500; line-height: 1.3; }
+  .me span { display: block; font-size: var(--t-xs); color: var(--text-3); }
+
+  /* Main */
+  .main { position: relative; overflow-y: auto; }
+  .main::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 420px; pointer-events: none;
+    background: radial-gradient(60% 100% at 50% 0%, rgba(114,108,245,.09), transparent 70%);
+  }
+  .topbar {
+    position: relative;
+    display: flex; align-items: center; gap: var(--s-2);
+    height: 52px; padding: 0 var(--s-6);
+    border-bottom: 1px solid var(--line);
+    font-size: var(--t-sm); color: var(--text-3);
+  }
+  .topbar b { color: var(--text-1); font-weight: 500; }
+
+  .content { position: relative; max-width: 960px; margin: 0 auto; padding: var(--s-6) var(--s-6) var(--s-8); }
+
+  .tabs { display: flex; gap: var(--s-5); border-bottom: 1px solid var(--line); margin-bottom: var(--s-6); }
+  .tabs a {
+    padding-bottom: var(--s-3); margin-bottom: -1px;
+    font-size: var(--t-md); color: var(--text-3);
+    border-bottom: 1px solid transparent;
+  }
+  .tabs a.active { color: var(--text-1); border-color: var(--text-1); }
+
+  .page-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-5); }
+  .page-head h1 { font-size: var(--t-2xl); font-weight: 500; letter-spacing: -.02em; line-height: 1.2; }
+  .page-head p { margin-top: var(--s-2); color: var(--text-2); }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: var(--s-2);
+    height: 36px; padding: 0 var(--s-4);
+    border-radius: var(--r-md);
+    font-size: var(--t-md); font-weight: 500;
+    white-space: nowrap;
+    transition: background .15s, box-shadow .15s, opacity .15s, transform .1s;
+  }
+  .btn:active { transform: translateY(1px); }
+  .btn-primary {
+    background: var(--g-100); color: var(--g-950);
+    box-shadow: inset 0 1px 0 #fff, 0 0 0 1px rgba(244,244,246,.25), 0 8px 24px -10px rgba(244,244,246,.35);
+  }
+  .btn-primary:hover { background: #fff; }
+  .btn-primary:disabled { opacity: .4; cursor: default; transform: none; }
+  .btn-secondary { color: var(--text-1); box-shadow: inset 0 0 0 1px var(--g-700); }
+  .btn-secondary:hover { background: var(--hover); }
+  .btn-link { height: 28px; padding: 0 var(--s-2); font-size: var(--t-sm); font-weight: 400; color: var(--text-2); }
+  .btn-link:hover { color: var(--text-1); background: var(--hover); }
+
+  /* Seats + filter */
+  .toolbar { margin-top: var(--s-5); display: flex; align-items: center; justify-content: space-between; gap: var(--s-5); }
+  .search {
+    position: relative; width: 280px;
+  }
+  .search svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-3); }
+  .search input, .field-box {
+    width: 100%; height: 36px;
+    border-radius: var(--r-md);
+    background: rgba(244,244,246,.025);
+    border: 0; box-shadow: inset 0 0 0 1px var(--line-strong);
+    font-size: var(--t-md);
+    transition: box-shadow .15s, background .15s;
+  }
+  .search input { padding: 0 var(--s-3) 0 34px; outline: none; }
+  .search input::placeholder { color: var(--text-3); }
+  .search input:focus { box-shadow: inset 0 0 0 1px var(--g-600); background: rgba(244,244,246,.04); }
+
+  .seats { display: flex; align-items: center; gap: var(--s-3); font-size: var(--t-sm); color: var(--text-2); }
+  .seats b { color: var(--text-1); font-weight: 500; font-variant-numeric: tabular-nums; }
+  .meter { width: 96px; height: 4px; border-radius: 2px; background: var(--g-800); overflow: hidden; }
+  .meter i { display: block; height: 100%; background: var(--g-200); border-radius: 2px; transition: width .4s cubic-bezier(.2,.8,.2,1); }
+
+  /* Tables */
+  .section { margin-top: var(--s-5); }
+  .section + .section { margin-top: var(--s-6); }
+  .section-head { display: flex; align-items: baseline; gap: var(--s-2); margin-bottom: var(--s-3); }
+  .section-head h2 { font-size: var(--t-lg); font-weight: 500; }
+  .section-head .count { font-size: var(--t-sm); color: var(--text-3); font-variant-numeric: tabular-nums; }
+
+  .table {
+    border-radius: var(--r-lg);
+    background: rgba(18,18,21,.6);
+    box-shadow: inset 0 0 0 1px var(--line);
+    overflow: hidden;
+  }
+  .row {
+    display: grid; grid-template-columns: 1fr 140px 140px 132px; align-items: center; gap: var(--s-4);
+    padding: var(--s-3) var(--s-4);
+    min-height: 56px;
+  }
+  .row + .row { border-top: 1px solid var(--line); }
+  .row.head { min-height: 0; padding-top: var(--s-2); padding-bottom: var(--s-2); font-size: var(--t-xs); color: var(--text-3); background: rgba(244,244,246,.015); }
+  .person { display: flex; align-items: center; gap: var(--s-3); min-width: 0; }
+  .person div { min-width: 0; }
+  .person strong { display: block; font-weight: 500; line-height: 1.3; }
+  .person span { display: block; font-size: var(--t-sm); color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .muted { font-size: var(--t-sm); color: var(--text-2); }
+  .faint { font-size: var(--t-sm); color: var(--text-3); }
+  .actions { display: flex; justify-content: flex-end; gap: var(--s-1); }
+
+  .av {
+    width: 32px; height: 32px; border-radius: 50%; flex: none;
+    display: grid; place-items: center;
+    font-size: var(--t-xs); font-weight: 500;
+    background: var(--g-800); color: var(--g-300);
+    box-shadow: inset 0 0 0 1px var(--line);
+  }
+  .av.sm { width: 28px; height: 28px; }
+  .av.pending { background: transparent; color: var(--text-3); box-shadow: inset 0 0 0 1px var(--g-700); }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    height: 22px; padding: 0 var(--s-2);
+    border-radius: 999px;
+    font-size: var(--t-xs); color: var(--text-2);
+    box-shadow: inset 0 0 0 1px var(--line-strong);
+  }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--g-500); }
+  .dot.live { background: var(--green-400); box-shadow: 0 0 0 3px rgba(74,222,128,.12); }
+  .dot.wait { background: var(--iris-400); }
+
+  .empty { padding: var(--s-6) var(--s-4); text-align: center; color: var(--text-3); font-size: var(--t-sm); }
+
+  .row.new { animation: arrive 1.6s cubic-bezier(.2,.8,.2,1); }
+  @keyframes arrive {
+    0% { opacity: 0; transform: translateY(-6px); background: rgba(114,108,245,.14); }
+    25% { opacity: 1; transform: none; background: rgba(114,108,245,.14); }
+    100% { background: transparent; }
+  }
+
+  /* Dialog */
+  .scrim {
+    position: fixed; inset: 0; z-index: 20;
+    display: grid; place-items: center;
+    background: rgba(5,5,7,.6);
+    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+    opacity: 0; pointer-events: none;
+    transition: opacity .18s;
+  }
+  .scrim.open { opacity: 1; pointer-events: auto; }
+  .dialog {
+    width: 480px;
+    border-radius: 14px;
+    background: var(--g-900);
+    box-shadow: var(--e-4);
+    transform: translateY(8px) scale(.98);
+    transition: transform .22s cubic-bezier(.2,.8,.2,1);
+  }
+  .scrim.open .dialog { transform: none; }
+  .dialog-body { padding: var(--s-5); }
+  .dialog h2 { font-size: var(--t-xl); font-weight: 500; letter-spacing: -.01em; }
+  .dialog-body > p { margin-top: var(--s-1); color: var(--text-2); }
+
+  .field { margin-top: var(--s-5); }
+  .field label, .field .label { display: block; margin-bottom: var(--s-2); font-size: var(--t-sm); color: var(--text-2); }
+  .field-box {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+    height: auto; min-height: 40px; padding: 5px 6px;
+    cursor: text;
+  }
+  .field-box:focus-within { box-shadow: inset 0 0 0 1px var(--g-600), 0 0 0 3px rgba(149,144,255,.15); background: rgba(244,244,246,.04); }
+  .field-box.invalid { box-shadow: inset 0 0 0 1px #f87171, 0 0 0 3px rgba(248,113,113,.12); }
+  .field-box input { flex: 1; min-width: 160px; height: 28px; padding: 0 6px; border: 0; background: none; outline: none; }
+  .field-box input::placeholder { color: var(--text-3); }
+  .chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    height: 28px; padding: 0 4px 0 10px;
+    border-radius: var(--r-sm);
+    background: var(--g-800); box-shadow: inset 0 0 0 1px var(--line-strong);
+    font-size: var(--t-sm);
+  }
+  .chip button { width: 20px; height: 20px; display: grid; place-items: center; border-radius: 4px; color: var(--text-3); }
+  .chip button:hover { color: var(--text-1); background: var(--hover); }
+  .hint { margin-top: var(--s-2); font-size: var(--t-xs); color: var(--text-3); }
+  .hint.error { color: #fca5a5; }
+
+  .dropdown { position: relative; }
+  .trigger {
+    width: 100%; height: 40px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 var(--s-3);
+    border-radius: var(--r-md);
+    background: rgba(244,244,246,.025);
+    box-shadow: inset 0 0 0 1px var(--line-strong);
+    text-align: left;
+  }
+  .trigger:hover { background: rgba(244,244,246,.04); }
+  .trigger[aria-expanded="true"] { box-shadow: inset 0 0 0 1px var(--g-600), 0 0 0 3px rgba(149,144,255,.15); }
+  .trigger svg { color: var(--text-3); }
+  .menu {
+    position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 5;
+    padding: var(--s-1);
+    border-radius: var(--r-lg);
+    background: var(--g-850);
+    box-shadow: var(--e-4);
+    opacity: 0; transform: translateY(-4px); pointer-events: none;
+    transition: opacity .14s, transform .14s;
+  }
+  .menu.open { opacity: 1; transform: none; pointer-events: auto; }
+  .menu [role="option"] {
+    display: grid; grid-template-columns: 1fr 16px; align-items: center; column-gap: var(--s-3);
+    padding: var(--s-2) var(--s-3);
+    border-radius: var(--r-md);
+    cursor: pointer;
+  }
+  .menu [role="option"]:hover { background: rgba(244,244,246,.05); }
+  .menu .opt-title { font-weight: 500; }
+  .menu .opt-desc { grid-column: 1; font-size: var(--t-sm); color: var(--text-3); }
+  .menu .check { grid-row: 1 / span 2; grid-column: 2; color: var(--text-1); opacity: 0; }
+  .menu [aria-selected="true"] .check { opacity: 1; }
+
+  .dialog-foot {
+    display: flex; align-items: center; justify-content: space-between; gap: var(--s-3);
+    padding: var(--s-4) var(--s-5);
+    border-top: 1px solid var(--line);
+    background: rgba(244,244,246,.015);
+    border-radius: 0 0 14px 14px;
+  }
+  .dialog-foot .faint { font-variant-numeric: tabular-nums; }
+  .dialog-foot .buttons { display: flex; gap: var(--s-2); }
+
+  /* Toast */
+  .toast {
+    position: fixed; right: var(--s-5); bottom: var(--s-5); z-index: 30;
+    display: flex; align-items: center; gap: var(--s-3);
+    padding: var(--s-3) var(--s-4);
+    border-radius: var(--r-lg);
+    background: var(--g-850);
+    box-shadow: var(--e-4);
+    font-size: var(--t-md);
+    opacity: 0; transform: translateY(8px); pointer-events: none;
+    transition: opacity .2s, transform .25s cubic-bezier(.2,.8,.2,1);
+  }
+  .toast.show { opacity: 1; transform: none; }
+  .toast .tick { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; background: var(--g-100); color: var(--g-950); }
+  .toast span { color: var(--text-2); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-home" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.5 8 2l5.5 4.5V13a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z"/><path d="M6.5 14v-4h3v4"/></symbol>
+  <symbol id="i-agent" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4.5" width="11" height="8.5" rx="2"/><path d="M8 2v2.5M6 8.5v1M10 8.5v1"/></symbol>
+  <symbol id="i-runs" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8h2.5l2-5 3 10 2-5H14"/></symbol>
+  <symbol id="i-evals" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13V8M8 13V3M13 13v-7"/></symbol>
+  <symbol id="i-data" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="8" cy="4" rx="5" ry="2"/><path d="M3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4M3 8c0 1.1 2.2 2 5 2s5-.9 5-2"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="2"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></symbol>
+  <symbol id="i-search" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="m4.5 6.5 3.5 3.5 3.5-3.5"/></symbol>
+  <symbol id="i-updown" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 6 3-3 3 3M5 10l3 3 3-3"/></symbol>
+  <symbol id="i-check" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3.5 8.5 3 3 6-7"/></symbol>
+  <symbol id="i-x" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="m4.5 4.5 7 7M11.5 4.5l-7 7"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3.5" width="12" height="9" rx="1.5"/><path d="m2.5 4.5 5.5 4 5.5-4"/></symbol>
+  <symbol id="i-logo" viewBox="0 0 16 16" fill="currentColor"><path d="M8 2 14.5 14h-3.3L8 7.8 4.8 14H1.5z"/></symbol>
+</svg>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="workspace">
+      <div class="logo"><svg width="16" height="16"><use href="#i-logo"/></svg></div>
+      <div><strong>Acme</strong><span>Team plan</span></div>
+      <svg class="chev" width="16" height="16"><use href="#i-updown"/></svg>
+    </div>
+
+    <nav class="nav">
+      <a href="#"><svg width="16" height="16"><use href="#i-home"/></svg>Home</a>
+      <a href="#"><svg width="16" height="16"><use href="#i-agent"/></svg>Agents</a>
+      <a href="#"><svg width="16" height="16"><use href="#i-runs"/></svg>Runs</a>
+      <a href="#"><svg width="16" height="16"><use href="#i-evals"/></svg>Evaluations</a>
+      <a href="#"><svg width="16" height="16"><use href="#i-data"/></svg>Datasets</a>
+      <div class="nav-label">Workspace</div>
+      <a href="#" class="active"><svg width="16" height="16"><use href="#i-settings"/></svg>Settings</a>
+    </nav>
+
+    <div class="me">
+      <div class="av sm">MO</div>
+      <div><strong>Maya Okafor</strong><span>maya@acme.dev</span></div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">Settings <span>/</span> <b>Members</b></div>
+
+    <div class="content">
+      <nav class="tabs">
+        <a href="#">General</a>
+        <a href="#" class="active">Members</a>
+        <a href="#">Billing</a>
+        <a href="#">API keys</a>
+      </nav>
+
+      <div class="page-head">
+        <div>
+          <h1>Members</h1>
+          <p>People who can build and run agents in Acme.</p>
+        </div>
+        <button class="btn btn-primary" id="open-invite"><svg width="16" height="16"><use href="#i-plus"/></svg>Invite members</button>
+      </div>
+
+      <div class="toolbar">
+        <label class="search">
+          <svg width="16" height="16"><use href="#i-search"/></svg>
+          <input id="filter" placeholder="Filter by name or email" autocomplete="off">
+        </label>
+        <div class="seats"><span><b id="seats-used"></b> of <b id="seats-total"></b> seats used</span><div class="meter"><i id="seats-bar"></i></div></div>
+      </div>
+
+      <section class="section">
+        <div class="section-head"><h2>Pending invites</h2><span class="count" id="invite-count"></span></div>
+        <div class="table" id="invites">
+          <div class="row head"><span>Email</span><span>Role</span><span>Invited</span><span></span></div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head"><h2>Members</h2><span class="count" id="member-count"></span></div>
+        <div class="table" id="members">
+          <div class="row head"><span>Name</span><span>Role</span><span>Last active</span><span></span></div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<div class="scrim" id="invite-dialog" aria-hidden="true">
+  <form class="dialog" role="dialog" aria-modal="true" aria-labelledby="invite-title" id="invite-form" novalidate>
+    <div class="dialog-body">
+      <h2 id="invite-title">Invite to Acme</h2>
+      <p>They'll get an email with a link to join.</p>
+
+      <div class="field">
+        <label for="invite-email">Email addresses</label>
+        <div class="field-box" id="email-box">
+          <input id="invite-email" type="email" placeholder="name@company.com" autocomplete="off">
+        </div>
+        <div class="hint" id="email-hint">Press Enter or comma to add more than one.</div>
+      </div>
+
+      <div class="field">
+        <span class="label" id="role-label">Role</span>
+        <div class="dropdown">
+          <button type="button" class="trigger" id="invite-role" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="role-label invite-role">
+            <span id="role-value">Member</span><svg width="16" height="16"><use href="#i-chev"/></svg>
+          </button>
+          <div class="menu" role="listbox" id="role-menu" aria-labelledby="role-label"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="dialog-foot">
+      <span class="faint" id="seats-left"></span>
+      <div class="buttons">
+        <button type="button" class="btn btn-secondary" id="cancel-invite">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="send-invite" disabled>Send invite</button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<div class="toast" id="toast" role="status"><div class="tick"><svg width="12" height="12"><use href="#i-check"/></svg></div><div id="toast-text"></div></div>
+
+<script>
+  const SEATS = 10;
+  const ROLES = [
+    { name: "Admin", desc: "Manage members, billing and keys" },
+    { name: "Member", desc: "Build, run and evaluate agents" },
+    { name: "Viewer", desc: "See runs and results, no edits" },
+  ];
+  const minutes = (n) => Date.now() - n * 60_000;
+  const members = [
+    { name: "Maya Okafor", email: "maya@acme.dev", role: "Owner", active: minutes(0) },
+    { name: "Daniel Brooks", email: "daniel@acme.dev", role: "Admin", active: minutes(14) },
+    { name: "Lena Fischer", email: "lena@acme.dev", role: "Member", active: minutes(52) },
+    { name: "Arjun Mehta", email: "arjun@acme.dev", role: "Member", active: minutes(60 * 5) },
+    { name: "Sofia Castillo", email: "sofia@acme.dev", role: "Member", active: minutes(60 * 26) },
+    { name: "Hana Sato", email: "hana@acme.dev", role: "Viewer", active: minutes(60 * 24 * 6) },
+  ];
+  const invites = [{ email: "chris.nolan@acme.dev", role: "Member", at: minutes(60 * 49) }];
+
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  const initials = (name) => name.split(" ").map((p) => p[0]).join("").slice(0, 2);
+  const isEmail = (s) => /^[^\s@,]+@[^\s@,]+\.[^\s@,]+$/.test(s);
+
+  function ago(t) {
+    const m = Math.round((Date.now() - t) / 60_000);
+    if (m < 2) return "Just now";
+    if (m < 60) return `${m} min ago`;
+    const h = Math.round(m / 60);
+    if (h < 24) return `${h} h ago`;
+    const d = Math.round(h / 24);
+    return d === 1 ? "Yesterday" : `${d} days ago`;
+  }
+
+  const seatsTaken = () => members.length + invites.length;
+
+  function render(fresh) {
+    const q = $("filter").value.trim().toLowerCase();
+    const match = (...fields) => !q || fields.some((f) => f.toLowerCase().includes(q));
+
+    const rows = members.filter((m) => match(m.name, m.email)).map((m) => `
+      <div class="row">
+        <div class="person"><div class="av">${initials(m.name)}</div><div><strong>${esc(m.name)}</strong><span>${esc(m.email)}</span></div></div>
+        <div>${m.role === "Owner" ? '<span class="badge">Owner</span>' : `<span class="muted">${m.role}</span>`}</div>
+        <div class="faint">${Date.now() - m.active < 5 * 60_000 ? '<span class="badge"><i class="dot live"></i>Online</span>' : ago(m.active)}</div>
+        <div></div>
+      </div>`);
+    $("members").querySelectorAll(".row:not(.head), .empty").forEach((el) => el.remove());
+    $("members").insertAdjacentHTML("beforeend", rows.join("") || '<div class="empty">No members match that filter.</div>');
+
+    const pending = invites.filter((i) => match(i.email)).map((i) => `
+      <div class="row${i === fresh ? " new" : ""}" data-email="${esc(i.email)}">
+        <div class="person"><div class="av pending"><svg width="14" height="14"><use href="#i-mail"/></svg></div><div><strong>${esc(i.email)}</strong></div></div>
+        <div class="muted">${i.role}</div>
+        <div><span class="badge"><i class="dot wait"></i>${ago(i.at)}</span></div>
+        <div class="actions"><button class="btn btn-link" data-act="resend">Resend</button><button class="btn btn-link" data-act="revoke">Revoke</button></div>
+      </div>`);
+    $("invites").querySelectorAll(".row:not(.head), .empty").forEach((el) => el.remove());
+    $("invites").insertAdjacentHTML("beforeend", pending.join("") || `<div class="empty">${q ? "No invites match that filter." : "No pending invites. Invite someone to see them here."}</div>`);
+
+    $("member-count").textContent = members.length;
+    $("invite-count").textContent = invites.length || "";
+    $("seats-used").textContent = seatsTaken();
+    $("seats-total").textContent = SEATS;
+    $("seats-bar").style.width = `${(seatsTaken() / SEATS) * 100}%`;
+  }
+
+  $("filter").addEventListener("input", () => render());
+  $("invites").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-act]");
+    if (!btn) return;
+    const email = btn.closest(".row").dataset.email;
+    const i = invites.findIndex((x) => x.email === email);
+    if (btn.dataset.act === "revoke") {
+      invites.splice(i, 1);
+      render();
+      toast(`Invite to <b>${esc(email)}</b> revoked`);
+    } else {
+      invites[i].at = Date.now();
+      render();
+      toast(`Invite resent to <b>${esc(email)}</b>`);
+    }
+  });
+
+  let toastTimer;
+  function toast(html) {
+    $("toast-text").innerHTML = html;
+    $("toast").classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => $("toast").classList.remove("show"), 4000);
+  }
+
+  /* Invite dialog */
+  let emails = [];
+  let role = "Member";
+
+  function renderEmails() {
+    $("email-box").querySelectorAll(".chip").forEach((el) => el.remove());
+    $("invite-email").insertAdjacentHTML("beforebegin", emails.map((e, n) =>
+      `<span class="chip">${esc(e)}<button type="button" data-n="${n}" aria-label="Remove ${esc(e)}"><svg width="12" height="12"><use href="#i-x"/></svg></button></span>`).join(""));
+    $("invite-email").placeholder = emails.length ? "" : "name@company.com";
+    updateFooter();
+  }
+
+  function pendingEmails() {
+    const typed = $("invite-email").value.trim();
+    return typed ? [...emails, typed] : emails;
+  }
+
+  function updateFooter() {
+    const n = pendingEmails().length;
+    const left = SEATS - seatsTaken();
+    $("send-invite").disabled = n === 0;
+    $("send-invite").textContent = n > 1 ? `Send ${n} invites` : "Send invite";
+    $("seats-left").textContent = n > left ? `Only ${left} seat${left === 1 ? "" : "s"} left` : `${left - n} of ${SEATS} seats left after this`;
+  }
+
+  function setError(msg) {
+    $("email-box").classList.toggle("invalid", !!msg);
+    $("email-hint").classList.toggle("error", !!msg);
+    $("email-hint").textContent = msg || "Press Enter or comma to add more than one.";
+  }
+
+  function addTyped() {
+    const value = $("invite-email").value.trim().replace(/,$/, "");
+    if (!value) return true;
+    if (!isEmail(value)) { setError(`“${value}” isn't a valid email address.`); return false; }
+    if (emails.includes(value) || members.some((m) => m.email === value) || invites.some((i) => i.email === value)) {
+      setError(`${value} is already in the workspace or invited.`);
+      return false;
+    }
+    emails.push(value);
+    $("invite-email").value = "";
+    setError("");
+    renderEmails();
+    return true;
+  }
+
+  function openDialog() {
+    emails = [];
+    role = "Member";
+    $("invite-email").value = "";
+    setError("");
+    renderEmails();
+    renderRoles();
+    $("invite-dialog").classList.add("open");
+    $("invite-dialog").setAttribute("aria-hidden", "false");
+    setTimeout(() => $("invite-email").focus(), 50);
+  }
+  function closeDialog() {
+    closeMenu();
+    $("invite-dialog").classList.remove("open");
+    $("invite-dialog").setAttribute("aria-hidden", "true");
+  }
+
+  $("open-invite").addEventListener("click", openDialog);
+  $("cancel-invite").addEventListener("click", closeDialog);
+  $("invite-dialog").addEventListener("mousedown", (e) => { if (e.target === e.currentTarget) closeDialog(); });
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    if ($("role-menu").classList.contains("open")) closeMenu();
+    else if ($("invite-dialog").classList.contains("open")) closeDialog();
+  });
+
+  $("email-box").addEventListener("click", (e) => {
+    const remove = e.target.closest("button[data-n]");
+    if (remove) { emails.splice(Number(remove.dataset.n), 1); renderEmails(); }
+    $("invite-email").focus();
+  });
+  $("invite-email").addEventListener("input", () => { setError(""); updateFooter(); });
+  $("invite-email").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === ",") {
+      if (e.key === "Enter" && !$("invite-email").value.trim()) return;
+      e.preventDefault();
+      addTyped();
+    } else if (e.key === "Backspace" && !$("invite-email").value && emails.length) {
+      emails.pop();
+      renderEmails();
+    }
+  });
+
+  function renderRoles() {
+    $("role-value").textContent = role;
+    $("role-menu").innerHTML = ROLES.map((r) => `
+      <div role="option" aria-selected="${r.name === role}" data-role="${r.name}">
+        <span class="opt-title">${r.name}</span>
+        <span class="opt-desc">${r.desc}</span>
+        <svg class="check" width="16" height="16"><use href="#i-check"/></svg>
+      </div>`).join("");
+  }
+  function closeMenu() {
+    $("role-menu").classList.remove("open");
+    $("invite-role").setAttribute("aria-expanded", "false");
+  }
+  $("invite-role").addEventListener("click", () => {
+    const open = !$("role-menu").classList.contains("open");
+    $("role-menu").classList.toggle("open", open);
+    $("invite-role").setAttribute("aria-expanded", String(open));
+  });
+  $("role-menu").addEventListener("click", (e) => {
+    const opt = e.target.closest("[role=option]");
+    if (!opt) return;
+    role = opt.dataset.role;
+    renderRoles();
+    closeMenu();
+  });
+  document.addEventListener("mousedown", (e) => {
+    if (!e.target.closest(".dropdown")) closeMenu();
+  });
+
+  $("invite-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    if (!addTyped() || !emails.length) return;
+    if (emails.length > SEATS - seatsTaken()) {
+      setError(`You have ${SEATS - seatsTaken()} seats left. Remove someone or upgrade your plan.`);
+      return;
+    }
+    const sent = emails.map((email) => ({ email, role, at: Date.now() }));
+    invites.unshift(...sent);
+    closeDialog();
+    render(sent[0]);
+    toast(sent.length === 1
+      ? `Invite sent to <b>${esc(sent[0].email)}</b> <span>as ${role}</span>`
+      : `${sent.length} invites sent <span>as ${role}</span>`);
+  });
+
+  render();
+</script>
+</body>
+</html>

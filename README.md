@@ -4,6 +4,8 @@ Screen studio for your agent.
 
 Your agent writes a short script. showem plays it in a headless browser and turns it into a polished video with zooms, a smooth cursor and captions. It never touches your screen.
 
+https://github.com/user-attachments/assets/46d9736a-29d2-4695-ad68-f77766854112
+
 ## Install
 
 ```sh
@@ -17,6 +19,13 @@ brew install artsiomshaitar/tap/showem
 ```
 
 macOS only for now. The first run downloads Chromium and ffmpeg into `~/.showem`.
+
+Homebrew sets up tab completion for you. With the install script, add this to your shell config:
+
+```sh
+source <(showem completion zsh)    # ~/.zshrc
+source <(showem completion bash)   # ~/.bashrc
+```
 
 ## Give it to your agent
 

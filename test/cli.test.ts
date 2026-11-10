@@ -42,3 +42,8 @@ test("-v prints the version and -h prints the help", () => {
   expect(cli(["-h"], "").out).toStartWith("Usage: showem");
   expect(cli(["--help"], "").code).toBe(0);
 });
+
+test("completion prints a shell script, or the usage for an unknown shell", () => {
+  expect(cli(["completion", "zsh"], "").out).toStartWith("#compdef showem");
+  expect(cli(["completion", "tcsh"], "").code).toBe(1);
+});

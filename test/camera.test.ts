@@ -7,11 +7,16 @@ import { MAIN, makeRecording, makeScript, VIEWPORT } from "./fixtures.ts";
 const l = layout(makeScript(), MAIN);
 
 describe("wordFocus", () => {
-  test("adds a point at the middle of each finished word", () => {
+  test("looks at the middle of each word from when the caret reaches it", () => {
     const caret = [0, 10, 20, 30, 40, 50, 60].map((x, i) => ({ t: i * 100, x: 100 + x, y: 50 }));
     const focus = wordFocus(caret, "ab cde");
     expect(focus.map((f) => f.x)).toEqual([100, 110, 145]);
-    expect(focus.map((f) => f.t)).toEqual([0, 300, 600]);
+    expect(focus.map((f) => f.t)).toEqual([0, 0, 300]);
+  });
+
+  test("keeps the starting caret when the first word wraps to the next line", () => {
+    const caret = [{ t: 0, x: 300, y: 50 }, { t: 100, x: 10, y: 80 }, { t: 200, x: 20, y: 80 }];
+    expect(wordFocus(caret, "ab")).toEqual([{ t: 0, x: 300, y: 50 }]);
   });
 
   test("is empty without caret samples", () => {

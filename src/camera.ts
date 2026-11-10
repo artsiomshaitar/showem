@@ -39,7 +39,10 @@ const SAMPLE_MS = 1000 / 240;
 const SPRING_STIFFNESS = 11;
 const SMOOTHING_S = 0.015;
 
-/** One focus point per typed word, at the middle of the word, once the word is finished. */
+/**
+ * The caret where typing starts, then one focus point per typed word, at the middle of the word, from when the caret
+ * reaches it. The recording already knows where each word ends, so the camera can head there while it is being typed.
+ */
 export function wordFocus(caret: readonly Sample[], text: string): Sample[] {
   const first = caret[0];
   if (!first) return [];
@@ -53,7 +56,7 @@ export function wordFocus(caret: readonly Sample[], text: string): Sample[] {
     const space = /\s/.test(ch);
     if (!space && i < chars.length - 1) return;
     const end = space ? before : after;
-    if (end.x > wordStart.x) out.push({ t: after.t, x: (wordStart.x + end.x) / 2, y: (wordStart.y + end.y) / 2 });
+    if (end.x > wordStart.x) out.push({ t: wordStart.t, x: (wordStart.x + end.x) / 2, y: (wordStart.y + end.y) / 2 });
     wordStart = after;
   });
   return out;
