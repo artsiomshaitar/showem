@@ -116,7 +116,7 @@ Every step except `pause-recording` and `resume-recording` can have a `caption`.
 - `select` picks a dropdown option by its visible text (`option: Waiting on parts`). Use it for every dropdown, native `<select>` or one made of page elements: showem tells them apart and shows the menu in the video either way. For a native one, `target` is the `<select>`; otherwise it's the element that opens the dropdown.
 - `type` works on native date and time inputs too: write the value (`2:00 PM`, `2026-11-07`, `2026-11-07T14:00`) and showem types it into the input's parts. Don't press keys to move between the parts.
 - To show something without pointing at it, `scroll` with `target` brings it smoothly into view. Steps that point at an element already scroll to it. `y` (pixels) is for scrolling by an amount.
-- `zoom` (on click, hover, type, select): `true` uses the script's `zoom` scale, a number zooms to that scale. Zoom on the steps that matter, not on every step. Close zooms are joined into one smooth pan. On a zoomed `type` step the camera follows the last typed word.
+- `zoom` (on click, hover, type, select): `true` uses the script's `zoom` scale, a number zooms to that scale. Zoom on the steps that matter, not on every step. Close zooms are joined into one smooth pan. On a zoomed `type` step the camera follows the word being typed.
 - `keep-in-view`: a list of other elements to keep in frame with the target while zoomed, usually what the step changes (a new row, a toast). The camera zooms out below the scale if they don't fit.
 - `zoom-in` and `zoom-out`: zoom in on an element (a form, a dialog, a menu) and stay zoomed for several steps, until `zoom-out`, a `goto` or a `switch`. The camera follows the steps inside it. `keep-in-view` works on it too: list the elements to show and the camera frames them all.
 - Choosing between them: `zoom` is for a moment, `zoom-in` is for a scene. When one step is the point and the camera can pull back after it, use `zoom` on that step: it zooms in as the pointer arrives and out on its own. When the viewer should stay close for a while (several steps in one area, a pause to read something, steps like `press` or `wait` that can't zoom), use `zoom-in` and `zoom-out` around them.
@@ -230,6 +230,8 @@ EOF
 `--out` sets where the video goes. Always pass it: use the path the user asked for, or a folder outside their project, so the video and its work files don't end up in their repo. The recording (frames and a log, which can be large) is kept next to the video in `<video>.showem/`. Without `--out`, the video goes to the script's `output.path`, or `showem.mp4` in the current folder.
 
 `run` prints the MP4 path. Run it in the background if it's long.
+
+If the browser stopped drawing for a moment while the page was changing, `run` says which step and when, and the video jumps there. A hiccup is usually gone on the next try: record again, after putting the app's data back if the flow changed it. If it comes back at the same step, the app itself is busy there, and recording again won't help.
 
 To change only the look (style, zoom, transitions, a caption's wording with the same number of words), pass the changed script to `showem render -` with the same `--out`. It reuses the recording. Anything else needs `run`.
 

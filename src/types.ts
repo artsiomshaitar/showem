@@ -143,6 +143,14 @@ export interface Switch {
   freezeOutgoing?: boolean;
 }
 
+/** A moment the browser stopped drawing while the page was changing, so the video jumps there. Recording time. */
+export interface Stall {
+  screen: string;
+  step: number;
+  t: number;
+  ms: number;
+}
+
 export interface Recording {
   key: string;
   duration: number;
@@ -151,4 +159,5 @@ export interface Recording {
   switches: Switch[];
   steps: StepLog[];
   vars: Record<string, string>;
+  stalls?: Stall[];
 }

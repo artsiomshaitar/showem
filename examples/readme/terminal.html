@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>~/code/acme</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #131314;
+    --bar: #1c1c1e;
+    --line: rgba(255,255,255,.08);
+    --fg: #e8e6e3;
+    --dim: #8a8784;
+    --faint: #5c5a58;
+    --accent: #d97757;
+    --green: #8cc98a;
+    --link: #8ab4f8;
+    --prompt-bg: rgba(255,255,255,.05);
+    --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    display: grid; place-items: center;
+    overflow: hidden;
+    background: #000 url(/wallpaper) center / cover;
+    color: var(--fg);
+    font-family: var(--mono);
+    font-size: 17px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* A regular window on the desktop, not full screen. */
+  .window {
+    display: flex; flex-direction: column;
+    width: min(1180px, 100vw - 120px);
+    height: min(710px, 100vh - 80px);
+    border-radius: 12px;
+    background: var(--bg);
+    box-shadow: 0 0 0 1px rgba(255,255,255,.1), 0 30px 90px -12px rgba(0,0,0,.75);
+    overflow: hidden;
+  }
+
+  /* Draws every symbol once at load, so the browser doesn't stop to find a font for it mid-recording. */
+  .warm { position: absolute; opacity: 0; pointer-events: none; }
+
+  .titlebar {
+    position: relative; flex: none;
+    display: flex; align-items: center; justify-content: center;
+    height: 44px;
+    background: var(--bar);
+    border-bottom: 1px solid var(--line);
+    font-size: 13px; color: var(--dim);
+  }
+  .lights { position: absolute; left: 18px; display: flex; gap: 8px; }
+  .lights i { width: 12px; height: 12px; border-radius: 50%; }
+  .lights i:nth-child(1) { background: #ff5f57; }
+  .lights i:nth-child(2) { background: #febc2e; }
+  .lights i:nth-child(3) { background: #28c840; }
+
+  .screen { flex: 1; overflow-y: auto; scrollbar-width: none; padding: 24px 32px; }
+
+  .welcome {
+    display: inline-block;
+    padding: 14px 22px;
+    border: 1px solid var(--accent);
+    border-radius: 10px;
+  }
+  .welcome .star { color: var(--accent); }
+  .welcome b { font-weight: 600; }
+  .welcome .sub { color: var(--dim); padding-left: 2ch; }
+
+  .tips { margin-top: 22px; color: var(--dim); }
+  .tips div::before { content: "› "; color: var(--faint); }
+
+  .transcript { margin-top: 22px; }
+  .transcript > * + * { margin-top: 18px; }
+
+  .echo { color: var(--dim); background: var(--prompt-bg); padding: 4px 12px; border-radius: 6px; display: inline-block; max-width: 100%; }
+  .echo::before { content: "> "; }
+
+  .msg { display: grid; grid-template-columns: 2ch 1fr; }
+  .msg .bullet { color: var(--fg); }
+  .msg.tool .bullet { color: var(--green); }
+  .msg .name { font-weight: 600; }
+  .msg .args { color: var(--dim); }
+  .msg .out { grid-column: 2; color: var(--dim); }
+  .msg .out::before { content: "⎿  "; color: var(--faint); }
+  .appear { animation: appear .25s ease-out; }
+  @keyframes appear { from { opacity: 0; transform: translateY(4px); } }
+
+  .result a {
+    color: var(--link);
+    text-decoration: underline;
+    text-decoration-color: rgba(138,180,248,.45);
+    text-underline-offset: 4px;
+  }
+  .result a:hover { text-decoration-color: var(--link); }
+  .result .meta { grid-column: 2; color: var(--dim); }
+
+  .spinner { color: var(--accent); display: flex; gap: 1ch; }
+  .spinner .glyph { width: 1ch; display: inline-block; text-align: center; }
+  .spinner .word {
+    background: linear-gradient(90deg, var(--accent) 0%, var(--accent) 40%, #ffd2bf 50%, var(--accent) 60%, var(--accent) 100%);
+    background-size: 300% 100%;
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    animation: shimmer 1.8s linear infinite;
+  }
+  @keyframes shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
+  .spinner .stats { color: var(--dim); }
+
+  .prompt {
+    margin-top: 22px;
+    position: relative;
+    display: flex; align-items: center;
+    min-height: 54px;
+    padding: 12px 16px;
+    border: 1px solid #4a4846;
+    border-radius: 10px;
+  }
+  .prompt .caret-sign { color: var(--fg); margin-right: 1ch; }
+  .prompt .line { position: relative; flex: 1; white-space: pre-wrap; word-break: break-word; }
+  .prompt .placeholder { color: var(--faint); }
+  .prompt .block {
+    display: inline-block; width: 1ch; height: 1.25em; vertical-align: -0.2em;
+    background: var(--fg);
+    animation: blink 1.1s steps(1) infinite;
+  }
+  .prompt.typing .block { animation: none; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .prompt input {
+    position: absolute; inset: 0 -40px;
+    opacity: 0; border: 0; outline: none; background: none;
+    font: inherit; caret-color: transparent;
+  }
+  .prompt.busy { border-color: #2e2d2c; }
+  .prompt.busy .line, .prompt.busy .caret-sign { color: var(--faint); }
+  .prompt.busy .block { display: none; }
+
+  .hint { margin-top: 8px; padding-left: 16px; font-size: 14px; color: var(--faint); display: flex; justify-content: space-between; padding-right: 16px; }
+</style>
+</head>
+<body>
+<div class="warm" aria-hidden="true">⏺⎿✻✶✳✢✽·…×</div>
+<div class="window">
+<div class="titlebar"><div class="lights"><i></i><i></i><i></i></div>~/code/acme — agent</div>
+
+<div class="screen" id="screen">
+  <div class="welcome">
+    <div><span class="star">✻</span> <b>Welcome back, Maya</b></div>
+    <div class="sub">/help for help, /skills to see what's installed</div>
+    <div class="sub">cwd: ~/code/acme</div>
+  </div>
+
+  <div class="tips">
+    <div>Skills: showem, frontend, review</div>
+  </div>
+
+  <div class="transcript" id="transcript"></div>
+
+  <label class="prompt" id="prompt-box">
+    <span class="caret-sign">&gt;</span>
+    <span class="line"><span id="mirror"></span><span class="block"></span><span class="placeholder" id="placeholder">Try "record a demo of the signup flow"</span></span>
+    <input id="prompt" autocomplete="off" spellcheck="false" autofocus>
+  </label>
+  <div class="hint"><span id="hint-left">? for shortcuts</span></div>
+</div>
+</div>
+
+<script>
+  const params = new URLSearchParams(location.search);
+  const THINK_MS = Number(params.get("think") ?? 7000);
+  const VIDEO = params.get("video") ?? "/tmp/showem/member-invite.mp4";
+  const DURATION = params.get("duration") ?? "0:24";
+
+  const $ = (id) => document.getElementById(id);
+  const input = $("prompt");
+  const box = $("prompt-box");
+  let busy = false;
+  let typingTimer;
+
+  input.addEventListener("input", () => {
+    $("mirror").textContent = input.value;
+    $("placeholder").hidden = !!input.value;
+    box.classList.add("typing");
+    clearTimeout(typingTimer);
+    typingTimer = setTimeout(() => box.classList.remove("typing"), 500);
+  });
+
+  input.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" || busy || !input.value.trim()) return;
+    e.preventDefault();
+    submit(input.value.trim());
+  });
+
+  const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  const scrollDown = () => { $("screen").scrollTop = $("screen").scrollHeight; };
+
+  function add(html) {
+    $("transcript").insertAdjacentHTML("beforeend", html);
+    const el = $("transcript").lastElementChild;
+    el.classList.add("appear");
+    scrollDown();
+    return el;
+  }
+
+  const WORDS = ["Reading the app…", "Planning the shots…", "Recording…", "Rendering…"];
+  const GLYPHS = ["·", "✢", "✳", "✶", "✻", "✽", "✻", "✶", "✳", "✢"];
+
+  async function submit(text) {
+    busy = true;
+    input.value = "";
+    $("mirror").textContent = "";
+    box.classList.add("busy");
+    $("hint-left").textContent = "esc to interrupt";
+    add(`<div class="echo">${esc(text)}</div>`);
+
+    const spinner = add(`<div class="spinner"><span class="glyph"></span><span class="word"></span><span class="stats"></span></div>`);
+    const started = Date.now();
+    let frame = 0;
+    let word = WORDS[0];
+    const tick = setInterval(() => {
+      const s = Math.floor((Date.now() - started) / 1000);
+      spinner.querySelector(".glyph").textContent = GLYPHS[frame++ % GLYPHS.length];
+      spinner.querySelector(".word").textContent = word;
+      spinner.querySelector(".stats").textContent = `(${s}s · esc to interrupt)`;
+    }, 110);
+
+    const step = THINK_MS / 4;
+    const tool = (name, args, out) => {
+      const el = document.createElement("div");
+      el.className = "msg tool appear";
+      el.innerHTML = `<span class="bullet">⏺</span><span><span class="name">${name}</span><span class="args">(${esc(args)})</span></span><span class="out">${esc(out)}</span>`;
+      spinner.before(el);
+      scrollDown();
+    };
+
+    await sleep(step);
+    tool("Read", "src/settings/members.tsx", "Read 214 lines");
+    word = WORDS[1];
+    await sleep(step);
+    tool("Skill", "showem", "Loaded the script format");
+    word = WORDS[2];
+    await sleep(step);
+    tool("Bash", "showem run - --out " + VIDEO, "Recorded the invite flow, rendered 3840×2160 at 60 fps");
+    word = WORDS[3];
+    await sleep(step);
+
+    clearInterval(tick);
+    spinner.remove();
+    add(`<div class="msg result"><span class="bullet">⏺</span><span>Done. The member invite demo is ready:</span>
+      <span></span><span><a id="video-link" href="/player">${esc(VIDEO)}</a></span>
+      <span class="meta">${esc(DURATION)} · 3840×2160 · captions on each step</span></div>`);
+    $("video-link").addEventListener("click", (e) => e.preventDefault());
+
+    box.classList.remove("busy");
+    $("hint-left").textContent = "? for shortcuts";
+    busy = false;
+  }
+</script>
+</body>
+</html>
