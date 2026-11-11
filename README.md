@@ -2,7 +2,7 @@
 
 Screen studio for your agent. Ask it for a demo, and showem turns a short script into a polished video.
 
-https://github.com/user-attachments/assets/46d9736a-29d2-4695-ad68-f77766854112
+https://github.com/user-attachments/assets/abb0d138-7a27-4473-bb26-444e62b96af4
 
 ## How it works
 
