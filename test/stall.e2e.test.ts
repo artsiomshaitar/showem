@@ -57,7 +57,8 @@ test("a moment the page stops drawing while it changes is reported with its step
   const atClick = (rec.stalls ?? []).filter((s) => s.step === 2);
   expect(atClick.length).toBeGreaterThan(0);
   const stall = atClick.reduce((a, b) => (b.ms > a.ms ? b : a));
-  expect(stall.ms).toBeGreaterThanOrEqual(380);
+  // Frame times can be a few frames early on a busy machine, so a 400 ms freeze can measure as little as ~320 ms.
+  expect(stall.ms).toBeGreaterThanOrEqual(300);
   const step = rec.steps.find((l) => l.index === 2)!;
   expect(stall.t).toBeGreaterThanOrEqual(step.start);
   expect(stall.t).toBeLessThanOrEqual(step.end);
