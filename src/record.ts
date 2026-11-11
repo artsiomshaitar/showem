@@ -37,8 +37,11 @@ const MENU_PICK_MS = 200;
 const CAPTION_HOLD_MS = 600;
 /** A gap between two animation frames longer than this means the browser stopped drawing for a moment. */
 const STALL_MS = 100;
-/** With no screencast frame during such a gap, one this soon after it means the page changed meanwhile: the video jumps there. */
+/** The last frame drawn before such a gap can reach the screencast this long after the gap starts. */
 const STALL_FRAME_MS = 50;
+/** With no screencast frame during the gap, one this soon after it means the page changed meanwhile: the video jumps
+ * there. A busy machine can take over 80 ms to send that frame. */
+const STALL_NEXT_FRAME_MS = 120;
 
 type SaveStep = Extract<Step, { action: "save" }>;
 type SelectStep = Extract<Step, { action: "select" }>;
@@ -685,7 +688,7 @@ export async function record(script: Script, dir: string): Promise<Recording> {
       // Only a gap the video shows: no frame while the page wasn't drawing (the one it drew last can land just after
       // the gap starts), then one as soon as it drew again.
       const filmed = frames.some((f) => f.t > start + STALL_FRAME_MS && f.t < end);
-      if (filmed || !frames.some((f) => f.t >= end && f.t <= end + STALL_FRAME_MS)) continue;
+      if (filmed || !frames.some((f) => f.t >= end && f.t <= end + STALL_NEXT_FRAME_MS)) continue;
       const t = clock.at(start);
       const step = steps.find((l) => l.screen === screen && t >= l.start && t <= l.end);
       if (step) stalls.push({ screen, step: step.index, t, ms: Math.round(ms) });
