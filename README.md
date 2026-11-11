@@ -55,6 +55,17 @@ showem run demo.yaml
 # yaml-language-server: $schema=https://showem.shaitar.com/schema.json
 ```
 
+## FAQ
+
+**Can it record native apps?**\
+For now it can only record web apps. Native apps are coming soon.
+
+**Does it support other platforms?**\
+For now it only supports macOS. Linux support is coming soon.
+
+**Is it free?**\
+Yes, it's absolutely free and always will be. If you don't like something, just fork it - it's MIT.
+
 ## Development
 
 ```sh
@@ -62,5 +73,9 @@ bun install
 bun test
 bun src/cli.ts run examples/todo.demo.yaml
 ```
+
+## Contributing
+
+I don't accept pull requests, at least for now. If you have an idea, share it in [Ideas](https://github.com/artsiomshaitar/showem/discussions/categories/ideas). If something is broken, [open an issue](https://github.com/artsiomshaitar/showem/issues).
 
 MIT licensed.
