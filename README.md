@@ -22,7 +22,7 @@ curl -fsSL https://showem.shaitar.com/install.sh | sh
 Or install with:
 
 - Homebrew: `brew install artsiomshaitar/tap/showem`
-- a binary for [Apple silicon](https://github.com/artsiomshaitar/showem/releases/latest/download/showem-darwin-arm64.tar.gz) or [Intel](https://github.com/artsiomshaitar/showem/releases/latest/download/showem-darwin-x64.tar.gz)
+- a binary for [Apple silicon](https://github.com/artsiomshaitar/showem/releases/latest/download/showem-darwin-arm64.tar.gz) or [Intel](https://github.com/artsiomshaitar/showem/releases/latest/download/showem-darwin-x64.tar.gz). macOS blocks binaries downloaded in a browser, so after you unpack it, run `xattr -d com.apple.quarantine showem`
 
 Homebrew sets up tab completion. Otherwise add `source <(showem completion zsh)` to `~/.zshrc`, or `source <(showem completion bash)` to `~/.bashrc`.
 
