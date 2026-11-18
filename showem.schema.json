@@ -115,6 +115,11 @@
           "type": "number",
           "minimum": 1,
           "description": "Default: 60."
+        },
+        "bitrate": {
+          "type": "number",
+          "minimum": 0.1,
+          "description": "In Mbps. Higher is sharper and bigger. Default: none, quality stays constant and the size follows the content."
         }
       },
       "additionalProperties": false,

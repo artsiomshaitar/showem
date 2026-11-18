@@ -82,7 +82,8 @@ describe("stepsKey", () => {
 });
 
 test("defaults and limits", () => {
-  expect(outputOf(makeScript())).toEqual({ width: 2560, height: 1440, fps: 60 });
+  expect(outputOf(makeScript())).toEqual({ width: 2560, height: 1440, fps: 60, bitrate: undefined });
+  expect(outputOf(makeScript({ output: { bitrate: 8 } })).bitrate).toBe(8);
   const style = styleOf(makeScript({ style: { motionBlur: 3, shadow: -1 } }));
   expect(style.motionBlur).toBe(1);
   expect(style.shadow).toBe(0);

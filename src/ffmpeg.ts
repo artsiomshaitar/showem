@@ -7,13 +7,19 @@ export async function expectSuccess(proc: Subprocess, what: string) {
   if (code !== 0) throw new Error(`${what} exited with code ${code}`);
 }
 
-/** Pipes raw RGBA frames into an H.264 encoder. */
-export function startEncoder(outPath: string, size: Size, fps: number) {
+/**
+ * Pipes raw RGBA frames into an H.264 encoder: constant quality, or `bitrate` Mbps when given.
+ * The rate cap keeps every render part near the target, since parts are encoded separately.
+ */
+export function startEncoder(outPath: string, size: Size, fps: number, bitrate?: number) {
+  const rate = bitrate === undefined
+    ? ["-crf", "16"]
+    : ["-b:v", `${bitrate}M`, "-maxrate", `${bitrate}M`, "-bufsize", `${bitrate * 2}M`];
   const proc = Bun.spawn(
     [
       toolPath("ffmpeg"), "-y", "-loglevel", "error",
       "-f", "rawvideo", "-pix_fmt", "rgba", "-s", `${size.width}x${size.height}`, "-r", String(fps), "-i", "-",
-      "-c:v", "libx264", "-preset", "veryfast", "-crf", "16", "-pix_fmt", "yuv420p",
+      "-c:v", "libx264", "-preset", "veryfast", ...rate, "-pix_fmt", "yuv420p",
       outPath,
     ],
     { stdin: "pipe", stdout: "inherit", stderr: "inherit" },

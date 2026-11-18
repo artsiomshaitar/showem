@@ -152,6 +152,7 @@ export const TOP = object({
       width: num("Default: 2560.", { min: 1 }),
       height: num("Default: 1440.", { min: 1 }),
       fps: num("Default: 60.", { min: 1 }),
+      bitrate: num("In Mbps. Higher is sharper and bigger. Default: none, quality stays constant and the size follows the content.", { min: 0.1 }),
     },
     [],
     "The video file.",

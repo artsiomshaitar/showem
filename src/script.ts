@@ -152,6 +152,7 @@ export function outputOf(script: Script) {
     width: script.output?.width ?? 2560,
     height: script.output?.height ?? 1440,
     fps: script.output?.fps ?? 60,
+    bitrate: script.output?.bitrate,
   };
 }
 
