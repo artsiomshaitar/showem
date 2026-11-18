@@ -58,6 +58,7 @@ output:
   width: 2560
   height: 1440
   fps: 60
+  bitrate: 8              # Mbps, higher is sharper and bigger; leave it out for constant quality
 style:
   background: /path/to/wallpaper.png
   padding: 0.08

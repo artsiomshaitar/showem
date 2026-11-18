@@ -68,7 +68,7 @@ export interface Script {
   zoom?: number;
   /** How long the camera stays zoomed after a step ends. */
   zoomHoldMs?: number;
-  output?: Partial<Size> & { path?: string; fps?: number };
+  output?: Partial<Size> & { path?: string; fps?: number; bitrate?: number };
   style?: {
     background?: string;
     padding?: number;
