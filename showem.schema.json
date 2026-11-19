@@ -312,6 +312,75 @@
               "action": {
                 "type": "string",
                 "enum": [
+                  "drag"
+                ]
+              },
+              "target": {
+                "type": "string",
+                "description": "The element to grab, as a Playwright selector."
+              },
+              "to": {
+                "type": "string",
+                "description": "The element to drop on, as a Playwright selector: the pointer lets go over its center. Use this or `by`."
+              },
+              "by": {
+                "type": "object",
+                "properties": {
+                  "x": {
+                    "type": "number",
+                    "description": "Pixels to the right (negative: left). Default: 0."
+                  },
+                  "y": {
+                    "type": "number",
+                    "description": "Pixels down (negative: up). Default: 0."
+                  }
+                },
+                "additionalProperties": false,
+                "description": "How far to move from where the target was grabbed, in CSS pixels. Use this or `to`."
+              },
+              "duration-ms": {
+                "type": "number",
+                "minimum": 0,
+                "description": "How long the move takes with the button held. Default: depends on the distance, 500 to 1400."
+              },
+              "zoom": {
+                "anyOf": [
+                  {
+                    "const": true
+                  },
+                  {
+                    "type": "number",
+                    "minimum": 1
+                  }
+                ],
+                "description": "Zoom in on the target: `true` uses the script's `zoom` scale, a number zooms to that scale."
+              },
+              "keep-in-view": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "description": "The element, as a Playwright selector: `text=Save`, `#id`, `button:has-text(\"Save\")`, `[data-testid=x]`. Quote selectors that start with #."
+                },
+                "description": "Other elements to keep in frame with the target while zoomed, usually what the step changes (a new row, a toast). Needs `zoom`."
+              },
+              "caption": {
+                "type": "string",
+                "description": "Text shown before the step runs, until the next caption. The step waits until it can be read."
+              }
+            },
+            "required": [
+              "action",
+              "target"
+            ],
+            "additionalProperties": false,
+            "description": "Press the mouse on an element, move it with the button held, and let go: resize a panel by its edge, move a window, drop a card in another list. The pointer moves smoothly, so the page follows it frame by frame. With `zoom`, the camera frames the whole move, so a long drag zooms in less. Not on phone screens."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
                   "type"
                 ]
               },

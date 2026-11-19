@@ -18,6 +18,15 @@ describe("buildCursor", () => {
     expect(cursor(100 + 300).press).toBe(0);
   });
 
+  test("stays pressed while a drag holds the button, then springs back", () => {
+    const drag = buildCursor(makeScreen({ cursor: [{ t: 0, x: 0, y: 0 }], holds: [{ down: 1000, up: 2000 }] }));
+    expect(drag(900).press).toBe(0);
+    expect(drag(1030).press).toBeCloseTo(30 / 260);
+    expect(drag(1500).press).toBeCloseTo(0.19);
+    expect(drag(2000 + 130).press).toBeCloseTo(0.19 + 0.5);
+    expect(drag(2400).press).toBe(0);
+  });
+
   test("on a touch screen it jumps from tap to tap", () => {
     expect(buildCursor(screen, true)(50)).toMatchObject({ x: 0, y: 0 });
   });

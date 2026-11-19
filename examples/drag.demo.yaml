@@ -1,0 +1,65 @@
+screens:
+  desk:
+    url: ./drag/windows.html
+  board:
+    url: ./drag/kanban.html
+viewport:
+  width: 1440
+  height: 900
+output:
+  path: drag.mp4
+style:
+  background: ./assets/background.jpg
+
+steps:
+  - action: wait
+    ms: 800
+    caption: Windows you can move and resize
+
+  - action: drag
+    target: "#notes .titlebar"
+    by:
+      x: 140
+      y: 60
+    caption: Drag a window by its title bar
+
+  - action: drag
+    target: "#notes .handle.se"
+    by:
+      x: 220
+      y: 160
+    caption: Pull the corner to resize it
+
+  - action: drag
+    target: "#photos .handle.e"
+    by:
+      x: 200
+    zoom: true
+    caption: Or just one edge
+
+  - action: switch
+    screen: board
+    caption: A Kanban board
+
+  - action: hover
+    target: text=Fix login redirect loop
+    caption: Cards lift on hover
+
+  - action: drag
+    target: text=Fix login redirect loop
+    to: "#doing .cards"
+    caption: Drag a card to another column
+
+  - action: drag
+    target: text=Onboarding checklist
+    to: "#done .card"
+    caption: The other cards make room
+
+  - action: drag
+    target: "#details .grip"
+    by:
+      x: -220
+    caption: Widen the side panel from its edge
+
+  - action: wait
+    ms: 1000

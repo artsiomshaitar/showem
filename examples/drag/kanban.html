@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Board</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+    color: #1f2328; background: #f6f7f9; display: flex; flex-direction: column; overflow: hidden;
+  }
+  body.dragging, body.dragging * { cursor: grabbing !important; user-select: none; }
+  body.resizing, body.resizing * { cursor: col-resize !important; user-select: none; }
+  header {
+    height: 56px; flex: none; display: flex; align-items: center; gap: 12px; padding: 0 24px;
+    background: #fff; border-bottom: 1px solid #e7e9ee;
+  }
+  header h1 { font-size: 17px; margin: 0; }
+  header .crumb { color: #8a909c; }
+  header .avatars { margin-left: auto; display: flex; }
+  header .avatars span { width: 28px; height: 28px; border-radius: 50%; border: 2px solid #fff; margin-left: -6px; display: grid; place-items: center; font-size: 11px; font-weight: 600; color: #fff; }
+  main { flex: 1; display: flex; min-height: 0; }
+  .board { flex: 1; display: flex; gap: 16px; padding: 20px 24px; overflow-x: auto; min-width: 0; }
+  .column {
+    width: 280px; flex: none; display: flex; flex-direction: column; border-radius: 12px;
+    background: #eef0f4; transition: background .18s, box-shadow .18s;
+  }
+  .column.over { background: #e3e9fb; box-shadow: inset 0 0 0 2px #8aa4f0; }
+  .column h2 { display: flex; align-items: center; gap: 8px; margin: 0; padding: 14px 14px 10px; font-size: 13px; font-weight: 600; color: #4b515c; text-transform: uppercase; letter-spacing: .04em; }
+  .column h2 i { width: 8px; height: 8px; border-radius: 50%; display: block; }
+  .column h2 .count { margin-left: auto; font-weight: 500; color: #8a909c; background: #fff; border-radius: 10px; padding: 0 8px; font-size: 12px; letter-spacing: 0; }
+  .cards { flex: 1; display: flex; flex-direction: column; gap: 10px; padding: 4px 10px 14px; min-height: 60px; }
+  .card {
+    background: #fff; border-radius: 10px; padding: 12px 14px; cursor: grab;
+    border: 1px solid #e3e5ea; box-shadow: 0 1px 2px rgba(16,24,40,.04);
+    transition: box-shadow .16s, transform .16s, border-color .16s;
+  }
+  .card:hover { border-color: #c9cfdb; box-shadow: 0 4px 12px rgba(16,24,40,.08); transform: translateY(-1px); }
+  .card .tag { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 6px; margin-bottom: 8px; }
+  .card .title { font-weight: 600; margin-bottom: 10px; }
+  .card .meta { display: flex; align-items: center; gap: 8px; color: #8a909c; font-size: 12px; }
+  .card .meta span:last-child { margin-left: auto; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 10px; font-weight: 600; color: #fff; }
+  .card.lifted {
+    position: fixed; z-index: 100; pointer-events: none; margin: 0;
+    box-shadow: 0 18px 40px rgba(16,24,40,.22), 0 2px 6px rgba(16,24,40,.08);
+    transition: transform .18s, box-shadow .18s;
+  }
+  .card.dropping { transition: left .22s cubic-bezier(.2,.8,.2,1), top .22s cubic-bezier(.2,.8,.2,1), transform .22s, box-shadow .22s; }
+  .placeholder { border-radius: 10px; border: 2px dashed #a9b7e6; background: rgba(138,164,240,.12); flex: none; }
+  aside {
+    position: relative; flex: none; width: 320px; min-width: 260px; max-width: 640px;
+    background: #fff; border-left: 1px solid #e7e9ee; padding: 20px 22px; overflow: hidden;
+  }
+  aside .grip { position: absolute; left: -4px; top: 0; bottom: 0; width: 8px; cursor: col-resize; z-index: 5; }
+  aside .grip::after { content: ""; position: absolute; left: 3px; top: 0; bottom: 0; width: 2px; background: transparent; transition: background .15s; }
+  aside .grip:hover::after, body.resizing aside .grip::after { background: #6d8ef0; }
+  aside h3 { margin: 0 0 4px; font-size: 16px; }
+  aside .sub { color: #8a909c; margin-bottom: 18px; }
+  aside .row { display: flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid #f0f1f4; }
+  aside .row span:first-child { color: #8a909c; }
+  aside p { color: #4b515c; }
+</style>
+</head>
+<body>
+  <header>
+    <span class="crumb">Product /</span><h1>Q4 Launch</h1>
+    <div class="avatars"><span style="background:#e0679b">AK</span><span style="background:#5b8def">JL</span><span style="background:#34a77b">MR</span></div>
+  </header>
+  <main>
+    <div class="board" id="board"></div>
+    <aside id="details">
+      <div class="grip"></div>
+      <h3>Q4 Launch</h3>
+      <div class="sub">Board details</div>
+      <div class="row"><span>Owner</span><span>Ana K.</span></div>
+      <div class="row"><span>Due</span><span>Dec 12</span></div>
+      <div class="row"><span>Progress</span><span id="progress"></span></div>
+      <p>Drag the cards between columns as work moves along. Pull this panel's left edge to give it more room.</p>
+    </aside>
+  </main>
+
+<script>
+  const people = { AK: "#e0679b", JL: "#5b8def", MR: "#34a77b" };
+  const tags = { Design: ["#f4e8ff", "#7b3fc4"], Backend: ["#e6f4ea", "#24804a"], Frontend: ["#e8f0ff", "#2f5fd0"], Docs: ["#fff3e0", "#b4650c"] };
+  const columns = [
+    { id: "todo", name: "To do", color: "#a0a7b4", cards: [["Fix login redirect loop", "Backend", "JL", 3], ["Empty state for search", "Design", "AK", 1], ["Write migration guide", "Docs", "MR", 2]] },
+    { id: "doing", name: "In progress", color: "#f0a33a", cards: [["Billing settings page", "Frontend", "AK", 5], ["Rate limit the public API", "Backend", "JL", 2]] },
+    { id: "review", name: "In review", color: "#8a6cf0", cards: [["Onboarding checklist", "Frontend", "MR", 4]] },
+    { id: "done", name: "Done", color: "#34a77b", cards: [["New pricing tiers", "Design", "AK", 6]] },
+  ];
+
+  const board = document.getElementById("board");
+  board.innerHTML = columns.map((c) => `
+    <section class="column" id="${c.id}">
+      <h2><i style="background:${c.color}"></i>${c.name}<span class="count"></span></h2>
+      <div class="cards">${c.cards.map(([title, tag, who, n]) => `
+        <article class="card">
+          <span class="tag" style="background:${tags[tag][0]};color:${tags[tag][1]}">${tag}</span>
+          <div class="title">${title}</div>
+          <div class="meta"><span>💬 ${n}</span><span style="background:${people[who]}">${who}</span></div>
+        </article>`).join("")}
+      </div>
+    </section>`).join("");
+
+  const counts = () => {
+    for (const col of document.querySelectorAll(".column")) col.querySelector(".count").textContent = col.querySelectorAll(".cards .card").length;
+    const all = document.querySelectorAll(".cards .card").length;
+    document.getElementById("progress").textContent = `${document.querySelectorAll("#done .card").length} of ${all} done`;
+  };
+  counts();
+
+  // Moves an element in the DOM, animating its siblings from where they were (FLIP).
+  const flip = (els, change) => {
+    const before = new Map(els.map((el) => [el, el.getBoundingClientRect()]));
+    change();
+    for (const [el, r] of before) {
+      const now = el.getBoundingClientRect();
+      const dx = r.left - now.left, dy = r.top - now.top;
+      if (!dx && !dy) continue;
+      el.style.transition = "none";
+      el.style.transform = `translate(${dx}px, ${dy}px)`;
+      requestAnimationFrame(() => {
+        el.style.transition = "transform .2s cubic-bezier(.2,.8,.2,1)";
+        el.style.transform = "";
+      });
+    }
+  };
+
+  const ACTIVATE_PX = 4;
+  board.addEventListener("pointerdown", (e) => {
+    const card = e.target.closest(".card");
+    if (!card || e.button !== 0) return;
+    e.preventDefault();
+    const start = { x: e.clientX, y: e.clientY };
+    let drag = null;
+
+    const lift = () => {
+      const r = card.getBoundingClientRect();
+      const placeholder = document.createElement("div");
+      placeholder.className = "placeholder";
+      placeholder.style.height = `${r.height}px`;
+      card.replaceWith(placeholder);
+      document.body.append(card);
+      Object.assign(card.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, transition: "none" });
+      card.classList.add("lifted");
+      card.getBoundingClientRect();
+      card.style.transition = "";
+      card.style.transform = "rotate(2.5deg) scale(1.03)";
+      document.body.classList.add("dragging");
+      drag = { placeholder, offset: { x: start.x - r.left, y: start.y - r.top } };
+    };
+
+    const move = (ev) => {
+      if (!drag) {
+        if (Math.hypot(ev.clientX - start.x, ev.clientY - start.y) < ACTIVATE_PX) return;
+        lift();
+      }
+      card.style.left = `${ev.clientX - drag.offset.x}px`;
+      card.style.top = `${ev.clientY - drag.offset.y}px`;
+      const col = document.elementsFromPoint(ev.clientX, ev.clientY).map((el) => el.closest(".column")).find(Boolean);
+      document.querySelectorAll(".column.over").forEach((c) => c !== col && c.classList.remove("over"));
+      if (!col) return;
+      col.classList.add("over");
+      const list = col.querySelector(".cards");
+      const others = [...list.querySelectorAll(".card")];
+      const before = others.find((c) => { const r = c.getBoundingClientRect(); return ev.clientY < r.top + r.height / 2; });
+      const current = drag.placeholder.nextElementSibling;
+      if (drag.placeholder.parentElement === list && (current === before || (!before && !current))) return;
+      flip([...document.querySelectorAll(".cards .card")], () => list.insertBefore(drag.placeholder, before ?? null));
+    };
+
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      if (!drag) return;
+      document.body.classList.remove("dragging");
+      document.querySelectorAll(".column.over").forEach((c) => c.classList.remove("over"));
+      const r = drag.placeholder.getBoundingClientRect();
+      card.classList.add("dropping");
+      Object.assign(card.style, { left: `${r.left}px`, top: `${r.top}px`, transform: "" });
+      setTimeout(() => {
+        card.classList.remove("lifted", "dropping");
+        card.removeAttribute("style");
+        drag.placeholder.replaceWith(card);
+        counts();
+      }, 240);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  });
+
+  const aside = document.getElementById("details");
+  aside.querySelector(".grip").addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    const startX = e.clientX, startW = aside.offsetWidth;
+    document.body.classList.add("resizing");
+    const move = (ev) => (aside.style.width = `${startW + startX - ev.clientX}px`);
+    const up = () => {
+      document.body.classList.remove("resizing");
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  });
+</script>
+</body>
+</html>

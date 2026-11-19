@@ -59,6 +59,8 @@ export function checkScript(script: Script): Problem[] {
   if (script.screens && !Object.keys(script.screens).length) problems.push({ message: "`screens` is empty. Add at least one screen, or use `url` instead" });
   const screens = Object.keys(script.screens ?? {});
   const saved = new Set<string>();
+  const frames = Object.fromEntries(Object.entries(screensOf(script)).map(([name, s]) => [name, s.frame]));
+  let screen = Object.keys(frames)[0];
   let pausedAt: number | undefined;
   script.steps.forEach((step, i) => {
     const add = (message: string) => problems.push({ step: i, message });
@@ -69,6 +71,8 @@ export function checkScript(script: Script): Problem[] {
     // `screen` is missing on a step that failed its field check; that step already has its own error.
     if (step.action === "switch" && script.screens && step.screen !== undefined && !screens.includes(step.screen)) add(`there is no screen "${step.screen}". ${didYouMean(step.screen, screens)}`);
     if (step.action === "switch" && !script.screens) add("`switch` needs `screens` at the top of the script");
+    if (step.action === "switch" && step.screen in frames) screen = step.screen;
+    if (step.action === "drag" && screen && isPhone(frames[screen]!)) add("`drag` doesn't work on phone screens yet. Use it on a browser screen");
     if ("keepInView" in step && step.keepInView && step.action !== "zoom-in" && !step.zoom) add("`keep-in-view` only works with `zoom`. Add `zoom: true`, or remove it");
     for (const [, name] of JSON.stringify(step).matchAll(VAR)) {
       if (name && !saved.has(name)) add(`"\${${name}}" is used before it's saved. Add a \`save\` step with \`as: ${name}\` before this step`);

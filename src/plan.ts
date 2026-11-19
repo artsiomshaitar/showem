@@ -51,6 +51,8 @@ export interface Plan {
 }
 
 const CLICK_MS = 260;
+/** The point of a click's press where the pointer is smallest. */
+const HELD_PRESS = 0.19;
 const TAP_OUT_MS = 420;
 
 export function assertRecordingMatches(script: Script, rec: Recording) {
@@ -70,9 +72,17 @@ export function buildCursor(screen: ScreenRecording, touch = false): (t: number)
     return {
       x: b ? lerp(a.x, b.x, k) : a.x,
       y: b ? lerp(a.y, b.y, k) : a.y,
-      press: click === undefined ? 0 : (t - click) / CLICK_MS,
+      press: holdPress(screen, t) ?? (click === undefined ? 0 : (t - click) / CLICK_MS),
     };
   };
+}
+
+/** During a drag the pointer presses down like a click, stays down while the button is held, and springs back on letting go. */
+function holdPress(screen: ScreenRecording, t: number) {
+  const hold = screen.holds?.find((h) => t >= h.down && t < h.up + CLICK_MS * (1 - HELD_PRESS));
+  if (!hold) return undefined;
+  if (t < hold.up) return Math.min(HELD_PRESS, (t - hold.down) / CLICK_MS);
+  return HELD_PRESS + (t - hold.up) / CLICK_MS;
 }
 
 /** A tap fades in where the finger lands, presses, then fades out. */

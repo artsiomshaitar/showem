@@ -102,7 +102,7 @@ steps:
 
 Each step is a list item that starts with `action:`. Its other fields go on the lines below, lined up with `action:`. All names are kebab-case. Write one field per line, not `{ ... }` on one line, and put a blank line between steps.
 
-The actions are `goto`, `click`, `hover`, `type`, `select`, `press`, `scroll`, `wait-for`, `wait`, `switch`, `save`, `zoom-in`, `zoom-out`, `pause-recording` and `resume-recording`. For the exact fields:
+The actions are `goto`, `click`, `hover`, `drag`, `type`, `select`, `press`, `scroll`, `wait-for`, `wait`, `switch`, `save`, `zoom-in`, `zoom-out`, `pause-recording` and `resume-recording`. For the exact fields:
 
 ```sh
 showem docs           # every top-level field, how steps work, and the list of actions
@@ -116,8 +116,9 @@ Every step except `pause-recording` and `resume-recording` can have a `caption`.
 - `target` is a Playwright selector: `text=Save`, `#id`, `button:has-text("Save")`, `[data-testid=x]`. Put quotes around any selector that starts with `#`, or YAML reads it as a comment.
 - `select` picks a dropdown option by its visible text (`option: Waiting on parts`). Use it for every dropdown, native `<select>` or one made of page elements: showem tells them apart and shows the menu in the video either way. For a native one, `target` is the `<select>`; otherwise it's the element that opens the dropdown.
 - `type` works on native date and time inputs too: write the value (`2:00 PM`, `2026-11-07`, `2026-11-07T14:00`) and showem types it into the input's parts. Don't press keys to move between the parts.
+- `drag` presses on `target`, moves with the button held, and lets go: over the center of another element (`to`), or a number of pixels away (`by` with `x` and `y`). Use it for anything moved or resized with the mouse: a panel edge, a window, a slider, a card dropped in another list. Target the exact thing that is grabbed (the edge handle, the title bar), not the whole panel. The drop point is measured before the drag starts and must be on screen. With `zoom`, the camera frames the whole move. Not on phone screens. Native HTML drag and drop (`draggable`) shows no dragged image in the video, since the browser draws it outside the page.
 - To show something without pointing at it, `scroll` with `target` brings it smoothly into view. Steps that point at an element already scroll to it. `y` (pixels) is for scrolling by an amount.
-- `zoom` (on click, hover, type, select): `true` uses the script's `zoom` scale, a number zooms to that scale. Zoom on the steps that matter, not on every step. Close zooms are joined into one smooth pan. On a zoomed `type` step the camera follows the word being typed.
+- `zoom` (on click, hover, drag, type, select): `true` uses the script's `zoom` scale, a number zooms to that scale. Zoom on the steps that matter, not on every step. Close zooms are joined into one smooth pan. On a zoomed `type` step the camera follows the word being typed.
 - `keep-in-view`: a list of other elements to keep in frame with the target while zoomed, usually what the step changes (a new row, a toast). The camera zooms out below the scale if they don't fit.
 - `zoom-in` and `zoom-out`: zoom in on an element (a form, a dialog, a menu) and stay zoomed for several steps, until `zoom-out`, a `goto` or a `switch`. The camera follows the steps inside it. `keep-in-view` works on it too: list the elements to show and the camera frames them all.
 - Choosing between them: `zoom` is for a moment, `zoom-in` is for a scene. When one step is the point and the camera can pull back after it, use `zoom` on that step: it zooms in as the pointer arrives and out on its own. When the viewer should stay close for a while (several steps in one area, a pause to read something, steps like `press` or `wait` that can't zoom), use `zoom-in` and `zoom-out` around them.

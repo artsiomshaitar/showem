@@ -30,6 +30,7 @@ export type Step = StepBase &
     | { action: "goto"; url: string }
     | ({ action: "click"; target: string } & Zoomable)
     | ({ action: "hover"; target: string } & Zoomable)
+    | ({ action: "drag"; target: string; durationMs?: number } & ({ to: string } | { by: Partial<Point> }) & Zoomable)
     | ({ action: "type"; target: string; text: string; delayMs?: number } & Zoomable)
     | ({ action: "select"; target: string; option: string } & Zoomable)
     | { action: "zoom-in"; target: string; scale?: number; keepInView?: string[] }
@@ -123,6 +124,8 @@ export interface ScreenRecording {
   /** Pointer positions. On touch screens it jumps from tap to tap. */
   cursor: Sample[];
   clicks: number[];
+  /** Mouse button held down for a drag: pressed at `down`, let go at `up`. Missing in recordings made before drags. */
+  holds?: { down: number; up: number }[];
   urls: { t: number; url: string }[];
 }
 
