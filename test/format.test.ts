@@ -129,6 +129,13 @@ steps:
     ]);
   });
 
+  test("drag needs either to or by", () => {
+    expect(problems(`url: x\nsteps:\n  - action: drag\n    target: "#a"\n`)[0]).toContain(`drag needs either "to"`);
+    expect(problems(`url: x\nsteps:\n  - action: drag\n    target: "#a"\n    to: "#b"\n    by:\n      x: 10\n`)[0]).toContain(`drag needs either "to"`);
+    expect(problems(`url: x\nsteps:\n  - action: drag\n    target: "#a"\n    by: {}\n`)[0]).toContain(`"by" needs "x", "y" or both`);
+    expect(problems(`url: x\nsteps:\n  - action: drag\n    target: "#a"\n    by:\n      x: -240\n`)).toEqual([]);
+  });
+
   test("scroll needs either a target or y", () => {
     expect(problems(`url: x\nsteps:\n  - action: scroll\n`)[0]).toContain(`scroll needs either "target"`);
     expect(problems(`url: x\nsteps:\n  - action: scroll\n    y: 10\n    target: "#a"\n`)[0]).toContain(`scroll needs either "target"`);
@@ -137,7 +144,7 @@ steps:
 
   test("catch steps without action, missing fields and options that don't belong", () => {
     expect(problems(`url: x\nsteps:\n  - click: "#a"\n  - action: type\n    target: "#a"\n  - pause-recording\n  - action: wait\n    ms: 1\n  - action: resume-recording\n    caption: x\n`)).toEqual([
-      'demo.yaml:3 step 1 (click): the step is missing "action". Use one of: goto, click, hover, type, select, press, scroll, wait-for, wait, switch, save, zoom-in, zoom-out, pause-recording, resume-recording',
+      'demo.yaml:3 step 1 (click): the step is missing "action". Use one of: goto, click, hover, drag, type, select, press, scroll, wait-for, wait, switch, save, zoom-in, zoom-out, pause-recording, resume-recording',
       'demo.yaml:4 step 2 (type): "type" is missing "text"',
       'demo.yaml:6 step 3 (pause-recording): a step must be fields starting with `- action: ...`, not "pause-recording"',
       'demo.yaml:10 step 5 (resume-recording): "resume-recording" takes no other fields. Remove "caption"',

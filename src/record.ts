@@ -4,9 +4,9 @@ import { chromium, devices, type Browser, type Locator, type Page } from "playwr
 import { caretOf, MIRRORED_STYLES } from "./caret.ts";
 import { ensureTool } from "./deps.ts";
 import { TAP_LEAD_MS } from "./device.ts";
-import { center, union } from "./geometry.ts";
+import { center, clamp, lerp, union } from "./geometry.ts";
 import { menuLayout, rowBox } from "./menu.ts";
-import { cursorPath, TRANSITION_MS, travelMs } from "./motion.ts";
+import { cursorPath, easeInOutCubic, TRANSITION_MS, travelMs } from "./motion.ts";
 import { fillStep, isPhone, NOTICE_MS, pausesOf, readingMs, recordingKey, screensOf, styleOf, type Pause } from "./script.ts";
 import type { Box, Frame, Point, Recording, Sample, Script, ScreenRecording, Size, Stall, Step, StepLog, Switch } from "./types.ts";
 
@@ -22,6 +22,14 @@ const KEY_DELAY_MS = 60;
 const MOUSE_STEP_MS = 8;
 const SCROLL_PX_PER_TICK = 40;
 const SCROLL_TICK_MS = 16;
+/** A drag waits this long after pressing before it moves, and before letting go, so the page sees a grab and a drop. */
+const DRAG_GRAB_MS = 150;
+const DRAG_DROP_MS = 150;
+const MIN_DRAG_MS = 500;
+const MAX_DRAG_MS = 1400;
+const DRAG_MS_PER_PX = 1.5;
+/** Off camera a drag still moves in steps, for pages that only follow a pointer that keeps moving. */
+const OFF_CAMERA_DRAG_MS = 100;
 /** Quiet time around a switch: the result of the last step stays on screen before, and the next step waits after. */
 const BEFORE_SWITCH_MS = 500;
 const AFTER_SWITCH_MS = 600;
@@ -44,6 +52,7 @@ const STALL_FRAME_MS = 50;
 const STALL_NEXT_FRAME_MS = 120;
 
 type SaveStep = Extract<Step, { action: "save" }>;
+type DragStep = Extract<Step, { action: "drag" }>;
 type SelectStep = Extract<Step, { action: "select" }>;
 type NativeSelect = { options: string[]; selected: number; popup: boolean; fontSize: number };
 
@@ -200,6 +209,7 @@ class Clock {
 export class Director {
   readonly cursor: Sample[] = [];
   readonly clicks: number[] = [];
+  readonly holds: { down: number; up: number }[] = [];
   private pos: Point;
   private readonly home: Point;
 
@@ -243,6 +253,9 @@ export class Director {
         if (step.action === "type") await this.type(step.target, step.text, step.delayMs ?? KEY_DELAY_MS, log);
         break;
       }
+      case "drag":
+        await this.drag(step, log);
+        break;
       case "select": {
         const loc = page.locator(step.target).first();
         log.point = await this.pointOf(step.target);
@@ -305,6 +318,12 @@ export class Director {
       case "hover":
         await page.locator(step.target).first().hover();
         break;
+      case "drag": {
+        const from = center(await this.boxOf(step.target, false));
+        await page.mouse.move(from.x, from.y);
+        await this.dragAlong(from, await this.dropPoint(step, from), OFF_CAMERA_DRAG_MS);
+        break;
+      }
       case "select": {
         const loc = page.locator(step.target).first();
         await loc.waitFor({ state: "visible" });
@@ -380,13 +399,75 @@ export class Director {
   }
 
   private async pointOf(target: string) {
+    return center(await this.boxOf(target));
+  }
+
+  /** Brings the element into view, smoothly unless off camera, and returns its box. */
+  private async boxOf(target: string, smooth = true) {
     const loc = this.page.locator(target).first();
     await loc.waitFor({ state: "visible" });
-    await scrollIntoViewSmoothly(loc);
+    if (smooth) await scrollIntoViewSmoothly(loc);
     await loc.scrollIntoViewIfNeeded();
     const box = await loc.boundingBox();
     if (!box) throw new Error(`No bounding box for ${target}`);
-    return center(box);
+    return box;
+  }
+
+  /** Where a drag lets go: over the center of `to`, or `by` pixels away from where it grabbed. */
+  /** Where a drag lets go: over the center of `to`, or `by` pixels away from where it grabbed. It must be on screen to land. */
+  private async dropPoint(step: DragStep, from: Point): Promise<Point> {
+    let to: Point;
+    if ("by" in step) {
+      to = { x: from.x + (step.by.x ?? 0), y: from.y + (step.by.y ?? 0) };
+    } else {
+      const box = await this.page.locator(step.to).first().boundingBox();
+      if (!box) throw new Error(`drag: nothing visible matches ${step.to}`);
+      to = center(box);
+    }
+    const { width, height } = this.viewport;
+    if (to.x < 0 || to.y < 0 || to.x > width || to.y > height) {
+      throw new Error(`drag: the drop point (${Math.round(to.x)}, ${Math.round(to.y)}) is outside the ${width} x ${height} page, so nothing would be dropped`);
+    }
+    return to;
+  }
+
+  private async drag(step: DragStep, log: StepLog) {
+    const grabbed = await this.boxOf(step.target);
+    const from = center(grabbed);
+    const to = await this.dropPoint(step, from);
+    log.point = from;
+    log.shotBox = union([grabbed, { ...to, width: 0, height: 0 }]);
+    await this.moveTo(from);
+    log.actionAt = this.now();
+    await Bun.sleep(BEFORE_CLICK_MS);
+    const distance = Math.hypot(to.x - from.x, to.y - from.y);
+    const duration = step.durationMs ?? clamp(distance * DRAG_MS_PER_PX, MIN_DRAG_MS, MAX_DRAG_MS);
+    const hold = { down: this.now(), up: Infinity };
+    this.holds.push(hold);
+    await this.dragAlong(from, to, duration, (p) => this.cursor.push({ t: this.now(), ...p }));
+    hold.up = this.now();
+    this.pos = to;
+  }
+
+  /**
+   * Presses, moves to `to` with the button held, and lets go. The mouse moves every few milliseconds along a
+   * straight eased path, so the page redraws what is dragged all the way.
+   */
+  private async dragAlong(from: Point, to: Point, duration: number, onMove?: (at: Point) => void) {
+    await this.page.mouse.down();
+    await Bun.sleep(DRAG_GRAB_MS);
+    const start = Date.now();
+    for (;;) {
+      const k = duration > 0 ? Math.min(1, (Date.now() - start) / duration) : 1;
+      const e = easeInOutCubic(k);
+      const at = { x: lerp(from.x, to.x, e), y: lerp(from.y, to.y, e) };
+      await this.page.mouse.move(at.x, at.y);
+      onMove?.(at);
+      if (k >= 1) break;
+      await Bun.sleep(MOUSE_STEP_MS);
+    }
+    await Bun.sleep(DRAG_DROP_MS);
+    await this.page.mouse.up();
   }
 
   /** Brings the pointer to `at`. On a touch screen it waits for the tap instead. */
@@ -702,7 +783,7 @@ export async function record(script: Script, dir: string): Promise<Recording> {
       screens: Object.fromEntries(
         live.map((s): [string, ScreenRecording] => [
           s.name,
-          { frame: s.screen.frame, viewport: s.screen.viewport, frames: s.frames, cursor: s.director.cursor, clicks: s.director.clicks, urls: s.urls },
+          { frame: s.screen.frame, viewport: s.screen.viewport, frames: s.frames, cursor: s.director.cursor, clicks: s.director.clicks, holds: s.director.holds, urls: s.urls },
         ]),
       ),
       switches,

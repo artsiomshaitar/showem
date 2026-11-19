@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Desk</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+    color: #1d1d1f;
+    background: radial-gradient(1200px 700px at 20% 10%, #c9d8ff 0%, transparent 60%),
+                radial-gradient(900px 600px at 90% 90%, #ffd6e7 0%, transparent 60%), #eef1f7;
+    overflow: hidden;
+    user-select: none;
+  }
+  .dock {
+    position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%);
+    display: flex; gap: 10px; padding: 8px 12px;
+    background: rgba(255,255,255,.55); backdrop-filter: blur(16px);
+    border: 1px solid rgba(255,255,255,.7); border-radius: 18px;
+    box-shadow: 0 10px 30px rgba(30,40,80,.15);
+  }
+  .dock span { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; font-size: 22px; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,.08); }
+  .window {
+    position: absolute; display: flex; flex-direction: column;
+    background: #fff; border-radius: 12px; overflow: hidden;
+    box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 18px 40px rgba(30,40,80,.18);
+    border: 1px solid rgba(0,0,0,.08);
+    transition: box-shadow .2s, transform .2s;
+  }
+  .window.front { box-shadow: 0 1px 2px rgba(0,0,0,.1), 0 26px 60px rgba(30,40,80,.28); }
+  .window.moving { transform: scale(1.012); box-shadow: 0 2px 4px rgba(0,0,0,.1), 0 36px 80px rgba(30,40,80,.32); transition: box-shadow .2s, transform .2s; }
+  .titlebar {
+    height: 40px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 14px;
+    background: linear-gradient(#fbfbfd, #f2f3f6); border-bottom: 1px solid #e6e7eb; cursor: grab;
+  }
+  .moving .titlebar { cursor: grabbing; }
+  .lights { display: flex; gap: 7px; }
+  .lights i { width: 12px; height: 12px; border-radius: 50%; display: block; }
+  .lights i:nth-child(1) { background: #ff5f57; } .lights i:nth-child(2) { background: #febc2e; } .lights i:nth-child(3) { background: #28c840; }
+  .titlebar b { flex: 1; text-align: center; font-weight: 600; color: #444; margin-right: 52px; }
+  .body { flex: 1; overflow: hidden; padding: 18px 20px; }
+  .handle { position: absolute; z-index: 2; }
+  .handle.e { top: 10px; bottom: 10px; right: -4px; width: 8px; cursor: ew-resize; }
+  .handle.s { left: 10px; right: 10px; bottom: -4px; height: 8px; cursor: ns-resize; }
+  .handle.se { right: -4px; bottom: -4px; width: 18px; height: 18px; cursor: nwse-resize; }
+  .handle.se::after {
+    content: ""; position: absolute; right: 8px; bottom: 8px; width: 9px; height: 9px;
+    border-right: 2px solid #c3c6cf; border-bottom: 2px solid #c3c6cf; border-radius: 0 0 3px 0;
+  }
+  .size {
+    position: absolute; right: 12px; bottom: 12px; padding: 3px 8px; border-radius: 6px;
+    font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; color: #fff; background: rgba(20,24,40,.78);
+    opacity: 0; transition: opacity .15s; pointer-events: none;
+  }
+  .resizing .size { opacity: 1; }
+  .notes h2 { margin: 0 0 6px; font-size: 20px; }
+  .notes p { margin: 0 0 12px; color: #555; }
+  .notes ul { margin: 0; padding-left: 18px; color: #333; }
+  .photos .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
+  .photos .grid div { aspect-ratio: 1; border-radius: 8px; }
+</style>
+</head>
+<body>
+  <div class="window notes" id="notes" style="left:120px; top:90px; width:420px; height:300px">
+    <div class="titlebar"><div class="lights"><i></i><i></i><i></i></div><b>Notes</b></div>
+    <div class="body">
+      <h2>Launch checklist</h2>
+      <p>Everything left before Friday's release. Drag the title bar to move this window, or pull its edges to resize it.</p>
+      <ul>
+        <li>Final copy review with marketing</li>
+        <li>Record the product demo</li>
+        <li>Update pricing page screenshots</li>
+        <li>Send the announcement email</li>
+        <li>Turn on the feature flag for everyone</li>
+      </ul>
+    </div>
+    <div class="handle e"></div><div class="handle s"></div><div class="handle se"></div>
+    <div class="size"></div>
+  </div>
+
+  <div class="window photos" id="photos" style="left:640px; top:200px; width:360px; height:280px">
+    <div class="titlebar"><div class="lights"><i></i><i></i><i></i></div><b>Photos</b></div>
+    <div class="body"><div class="grid"></div></div>
+    <div class="handle e"></div><div class="handle s"></div><div class="handle se"></div>
+    <div class="size"></div>
+  </div>
+
+  <div class="dock"><span>📝</span><span>🖼️</span><span>📅</span><span>✉️</span><span>⚙️</span></div>
+
+<script>
+  const hues = [210, 340, 28, 160, 265, 190, 10, 120, 300, 45, 230, 0];
+  document.querySelector(".photos .grid").innerHTML = hues
+    .map((h) => `<div style="background: linear-gradient(135deg, hsl(${h} 80% 72%), hsl(${h + 40} 70% 55%))"></div>`).join("");
+
+  let z = 10;
+  const MIN_W = 240, MIN_H = 160;
+
+  for (const win of document.querySelectorAll(".window")) {
+    const size = win.querySelector(".size");
+    const showSize = () => (size.textContent = `${Math.round(win.offsetWidth)} × ${Math.round(win.offsetHeight)}`);
+    const front = () => {
+      document.querySelectorAll(".window.front").forEach((w) => w.classList.remove("front"));
+      win.classList.add("front");
+      win.style.zIndex = ++z;
+    };
+    win.addEventListener("pointerdown", front);
+
+    const drag = (el, onMove, cls) => {
+      el.addEventListener("pointerdown", (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        front();
+        el.setPointerCapture(e.pointerId);
+        const start = { x: e.clientX, y: e.clientY, left: win.offsetLeft, top: win.offsetTop, w: win.offsetWidth, h: win.offsetHeight };
+        win.classList.add(cls);
+        showSize();
+        const move = (ev) => { onMove(ev.clientX - start.x, ev.clientY - start.y, start); showSize(); };
+        const up = () => {
+          win.classList.remove(cls);
+          el.removeEventListener("pointermove", move);
+          el.removeEventListener("pointerup", up);
+        };
+        el.addEventListener("pointermove", move);
+        el.addEventListener("pointerup", up);
+      });
+    };
+
+    drag(win.querySelector(".titlebar"), (dx, dy, s) => {
+      win.style.left = `${s.left + dx}px`;
+      win.style.top = `${Math.max(0, s.top + dy)}px`;
+    }, "moving");
+    drag(win.querySelector(".handle.e"), (dx, _, s) => (win.style.width = `${Math.max(MIN_W, s.w + dx)}px`), "resizing");
+    drag(win.querySelector(".handle.s"), (_, dy, s) => (win.style.height = `${Math.max(MIN_H, s.h + dy)}px`), "resizing");
+    drag(win.querySelector(".handle.se"), (dx, dy, s) => {
+      win.style.width = `${Math.max(MIN_W, s.w + dx)}px`;
+      win.style.height = `${Math.max(MIN_H, s.h + dy)}px`;
+    }, "resizing");
+  }
+</script>
+</body>
+</html>

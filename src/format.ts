@@ -42,6 +42,19 @@ export const ACTIONS: Record<Step["action"], ActionSpec> = {
     required: ["target"],
     example: "- action: hover\n  target: \"#help\"\n  caption: Tips are one hover away",
   },
+  drag: {
+    doc: "Press the mouse on an element, move it with the button held, and let go: resize a panel by its edge, move a window, drop a card in another list. The pointer moves smoothly, so the page follows it frame by frame. With `zoom`, the camera frames the whole move, so a long drag zooms in less. Not on phone screens.",
+    fields: {
+      target: text("The element to grab, as a Playwright selector."),
+      to: text("The element to drop on, as a Playwright selector: the pointer lets go over its center. Use this or `by`."),
+      by: object({ x: num("Pixels to the right (negative: left). Default: 0."), y: num("Pixels down (negative: up). Default: 0.") }, [], "How far to move from where the target was grabbed, in CSS pixels. Use this or `to`."),
+      "duration-ms": num("How long the move takes with the button held. Default: depends on the distance, 500 to 1400.", { min: 0 }),
+      zoom,
+      "keep-in-view": keepInView,
+    },
+    required: ["target"],
+    example: "- action: drag\n  target: \"#sidebar .resize-handle\"\n  by:\n    x: -240\n  caption: Make it wider from its edge\n\n- action: drag\n  target: text=Fix login bug\n  to: \"#done\"\n  zoom: true\n  caption: Move it to Done",
+  },
   type: {
     doc: "Click an input and type into it, one key at a time. On a native date or time input it types the value into the input's parts (day, hour, AM/PM) the way a person would.",
     fields: { target, text: text("What to type. For a native date or time input, the value: `14:00` or `2:00 PM`, `2026-11-07`, `2026-11-07T14:00`."), "delay-ms": num("Pause between keys. Default: 60.", { min: 0 }), zoom, "keep-in-view": keepInView },
@@ -190,6 +203,8 @@ function readStep(raw: unknown, path: Path, issues: Issue[]): Step | undefined {
   const step = check(fieldsOf(name, spec), raw, path, issues, `"${name}"`) as Step;
   if (step.action === "save" && ("target" in step) === ("from" in step)) issues.push({ path, message: `save needs either "target" (an element) or "from" (url or clipboard)` });
   if (step.action === "scroll" && ("target" in step) === ("y" in step)) issues.push({ path, message: `scroll needs either "target" (an element to bring into view) or "y" (pixels)` });
+  if (step.action === "drag" && ("to" in step) === ("by" in step)) issues.push({ path, message: `drag needs either "to" (an element to drop on) or "by" (pixels to move)` });
+  if (step.action === "drag" && "by" in step && step.by.x === undefined && step.by.y === undefined) issues.push({ path: [...path, "by"], message: `"by" needs "x", "y" or both` });
   if (step.action === "save" && "from" in step && "attribute" in step) issues.push({ path, message: `"attribute" only works with "target"` });
   return step;
 }

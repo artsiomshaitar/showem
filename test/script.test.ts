@@ -124,6 +124,13 @@ describe("checkScript", () => {
     expect(problems({ steps })).toEqual([{ step: 0, message: '"${link}" is used before it\'s saved. Add a `save` step with `as: link` before this step' }]);
   });
 
+  test("rejects drag on a phone screen, also after switching to one", () => {
+    const drag: Step = { action: "drag", target: "#a", by: { x: 10 } };
+    expect(problems({ screens, steps: [drag] })).toEqual([]);
+    expect(problems({ screens, steps: [{ action: "switch", screen: "member" }, drag] })).toEqual([{ step: 1, message: expect.stringContaining("phone screens") }]);
+    expect(problems({ screens: { phone: screens.member, admin: screens.admin }, steps: [drag, { action: "switch", screen: "admin" }, drag] })).toEqual([{ step: 0, message: expect.stringContaining("phone screens") }]);
+  });
+
   test("keep-in-view needs zoom", () => {
     expect(problems({ steps: [{ action: "click", target: "#a", keepInView: ["#b"] }] })[0]?.message).toContain("only works with `zoom`");
   });
