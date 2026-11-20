@@ -21,7 +21,7 @@ describe("zoomOf", () => {
 describe("resolveScript", () => {
   const scriptPath = "/work/demos/intro.demo.json";
 
-  test("resolves relative paths and URLs against the script's folder", () => {
+  test("resolves relative paths and starting URLs against the script's folder, and leaves goto URLs for the page", () => {
     const { script, outPath } = resolveScript(
       makeScript({
         url: "./app/index.html",
@@ -32,7 +32,7 @@ describe("resolveScript", () => {
     );
     expect(script.url).toBe("file:///work/demos/app/index.html");
     expect(script.style?.background).toBe("/work/demos/bg.jpg");
-    expect(script.steps).toEqual([{ action: "goto", url: "file:///work/demos/app/next.html" }, { action: "goto", url: "https://example.com/x" }]);
+    expect(script.steps).toEqual([{ action: "goto", url: "./app/next.html" }, { action: "goto", url: "https://example.com/x" }]);
     expect(outPath).toBe("/work/demos/intro.demo.mp4");
   });
 
