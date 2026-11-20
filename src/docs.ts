@@ -1,4 +1,4 @@
-import { ACTIONS, fieldsOf, TOP, type ActionSpec } from "./format.ts";
+import { ACTIONS, CONFIG, fieldsOf, TOP, type ActionSpec } from "./format.ts";
 import { didYouMean, type Schema } from "./schema.ts";
 import type { Step } from "./types.ts";
 
@@ -92,7 +92,29 @@ ${actions.join("\n")}
 Example:
 ${indent(EXAMPLE)}
 
-Run \`showem docs <action>\` for an action's fields and an example.`;
+Run \`showem docs <action>\` for an action's fields and an example, and \`showem docs config\` for the project config.`;
+}
+
+const CONFIG_EXAMPLE = `style:
+  background: backgrounds/brand.jpg
+output:
+  width: 2560
+  height: 1440
+voice:
+  provider: elevenlabs
+  voice: <voice id>
+  api-key: \${{ env.ELEVENLABS_API_KEY }}`;
+
+/** What a project's \`.showem/config.yaml\` (or \`~/.showem/config.yaml\`) can set. */
+export function configDocs() {
+  return `A project's .showem/config.yaml sets these fields for every script in the project, and ~/.showem/config.yaml for every project.
+A script's own fields win over the project's, which win over ~/.showem's, field by field. A voice comes whole from one config.
+Paths are relative to the config's folder. Secrets go in .showem/.env, and the config names them: \${{ env.NAME }}.
+
+${table(rows(CONFIG).filter((r) => r.name !== "$schema"))}
+
+Example:
+${indent(CONFIG_EXAMPLE)}`;
 }
 
 /** One action: what it does, its fields and an example. */

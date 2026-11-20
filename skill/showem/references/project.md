@@ -14,6 +14,8 @@ Look for `.showem/config.yaml` before writing a script: showem finds it from the
 
 ## What the config sets
 
+`showem docs config` lists every field the config takes, with what it does.
+
 `style`, `output` (except `path`), `viewport`, `device-scale-factor`, `zoom`, `zoom-hold-ms` and `voice`. `~/.showem/config.yaml` sets the same fields for every project.
 
 A script's own fields win over the project's, which win over `~/.showem`'s, field by field: a script with `style.background` still gets the config's `style.padding`. Don't repeat the config's fields in the script. Set one only when the user asks for something different in this video. Paths in a config are relative to its folder.

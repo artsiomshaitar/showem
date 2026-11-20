@@ -1,0 +1,192 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "showem config",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "A JSON Schema for editors. Ignored by showem."
+    },
+    "viewport": {
+      "type": "object",
+      "properties": {
+        "width": {
+          "type": "number",
+          "minimum": 1
+        },
+        "height": {
+          "type": "number",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "width",
+        "height"
+      ],
+      "additionalProperties": false,
+      "description": "The page size in CSS pixels. Default: 1440 x 900."
+    },
+    "device-scale-factor": {
+      "type": "number",
+      "minimum": 1,
+      "description": "Pixel density of the recording. Default: 3."
+    },
+    "zoom": {
+      "type": "number",
+      "minimum": 1,
+      "description": "The scale of `zoom: true` steps and `zoom-in`. Default: 1.8."
+    },
+    "zoom-hold-ms": {
+      "type": "number",
+      "minimum": 0,
+      "description": "How long the camera stays zoomed after a step ends. Default: 300."
+    },
+    "style": {
+      "type": "object",
+      "properties": {
+        "background": {
+          "type": "string",
+          "description": "An image file shown behind the window."
+        },
+        "padding": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Space around the window, as a share of the video size. Default: 0.08."
+        },
+        "radius": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Corner radius of the window, as a share of the video size. Default: 0.018."
+        },
+        "shadow": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Window shadow, 0 to 1. Default: 0.6."
+        },
+        "motion-blur": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "0 (off) to 1 (strong), only while the camera or cursor moves. Default: 0.5."
+        },
+        "cursor": {
+          "type": "object",
+          "properties": {
+            "size": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Default: 1."
+            },
+            "travel-ms": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Longest time the pointer takes to move to a target. Default: 800."
+            }
+          },
+          "additionalProperties": false,
+          "description": "The pointer."
+        },
+        "captions": {
+          "type": "object",
+          "properties": {
+            "font-size": {
+              "type": "number",
+              "minimum": 1,
+              "description": "In video pixels. Default: 3% of the video height."
+            }
+          },
+          "additionalProperties": false,
+          "description": "Caption text."
+        }
+      },
+      "additionalProperties": false,
+      "description": "How the video looks. Changing it only needs `showem render`."
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "width": {
+          "type": "number",
+          "minimum": 1,
+          "description": "Default: 2560."
+        },
+        "height": {
+          "type": "number",
+          "minimum": 1,
+          "description": "Default: 1440."
+        },
+        "fps": {
+          "type": "number",
+          "minimum": 1,
+          "description": "Default: 60."
+        },
+        "bitrate": {
+          "type": "number",
+          "minimum": 0.1,
+          "description": "In Mbps. Higher is sharper and bigger. Default: none, quality stays constant and the size follows the content."
+        }
+      },
+      "additionalProperties": false,
+      "description": "The video file. Each script sets its own path."
+    },
+    "voice": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "type": "string",
+          "enum": [
+            "elevenlabs",
+            "openai",
+            "openrouter"
+          ],
+          "description": "A service showem knows: elevenlabs, openai or openrouter. For any other server with OpenAI's speech API (Kokoro, Qwen3-TTS, Chatterbox, LiteLLM), leave it out and set `base-url`."
+        },
+        "base-url": {
+          "type": "string",
+          "description": "Instead of `provider`: the API root of a server with OpenAI's speech API, like http://localhost:8880/v1. showem sends each caption to <base-url>/audio/speech."
+        },
+        "model": {
+          "type": "string",
+          "description": "The model. Required, except with elevenlabs (default: eleven_v4)."
+        },
+        "voice": {
+          "type": "string",
+          "description": "The voice: an ElevenLabs voice id, or one of the model's voice names."
+        },
+        "api-key": {
+          "type": "string",
+          "description": "`${{ env.NAME }}`: the variable with the key, set in `.showem/.env`, the project's `.env` or the environment. Never the key itself. Required with `provider`, optional with `base-url`."
+        },
+        "instructions": {
+          "type": "string",
+          "description": "How to speak, in one line, for models that take it (like OpenAI's gpt-4o-mini-tts): \"Warm, relaxed product narrator\". Not with elevenlabs, which uses `[audio tags]` instead."
+        },
+        "extra": {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              }
+            ]
+          },
+          "description": "More fields for each request, sent as they are, for options a server has beyond the usual ones. Example: `instruct: Warm narrator` and `temperature: 0.3` for mlx-audio's Qwen3-TTS."
+        },
+        "audio-tags": {
+          "type": "boolean",
+          "description": "Whether the model performs `[audio tags]` in captions. When false they're taken out before the caption is said. Default: true for ElevenLabs v3 and v4 models, false for everything else."
+        }
+      },
+      "required": [
+        "voice"
+      ],
+      "additionalProperties": false,
+      "description": "Narration read aloud over the video."
+    }
+  },
+  "additionalProperties": false
+}

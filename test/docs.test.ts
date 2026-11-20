@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
-import { actionDocs, overview } from "../src/docs.ts";
-import { ACTIONS, parseScript, TOP } from "../src/format.ts";
+import { actionDocs, configDocs, overview } from "../src/docs.ts";
+import { ACTIONS, CONFIG, parseScript, TOP } from "../src/format.ts";
 import type { Schema } from "../src/schema.ts";
 
 /** Fields without a description, as `parent.child`. Fields of a group without any docs (like a size) count as described by the group. */
@@ -15,6 +15,7 @@ function undocumented(schema: Schema, path: string): string[] {
 
 test("every field and action has a description", () => {
   expect(undocumented(TOP, "")).toEqual([]);
+  expect(undocumented(CONFIG, "")).toEqual([]);
   for (const [name, spec] of Object.entries(ACTIONS)) {
     expect(spec.doc).not.toBe("");
     expect(Object.entries(spec.fields ?? {}).flatMap(([key, field]) => undocumented(field, `${name}.${key}`))).toEqual([]);
@@ -47,4 +48,12 @@ test("an action's docs list its fields, the caption, and an example", () => {
 test("the skill's script reference names every action", async () => {
   const skill = await Bun.file("skill/showem/references/script.md").text();
   expect(Object.keys(ACTIONS).filter((name) => !skill.includes(`\`${name}\``))).toEqual([]);
+});
+
+test("docs config lists what a project config sets, voice included", () => {
+  const docs = configDocs();
+  expect(docs).toMatch(/^ {2}voice\.provider +choice /m);
+  expect(docs).toMatch(/^ {2}voice\.voice +required +text /m);
+  expect(docs).toContain("api-key: ${{ env.ELEVENLABS_API_KEY }}");
+  expect(docs).not.toMatch(/^ {2}(url|steps|output\.path) /m);
 });

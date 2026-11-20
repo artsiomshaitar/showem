@@ -10,7 +10,7 @@ const OUT_COMMANDS = ["try", "run", "record", "render"];
 /** The shell script that completes showem's commands, `docs` actions, script files and `--out`. */
 export function completion(shell: Shell, commands: readonly string[]): string {
   const all = [...commands, "-h", "--help", "-v", "--version"].join(" ");
-  const actions = Object.keys(ACTIONS).join(" ");
+  const actions = [...Object.keys(ACTIONS), "config"].join(" ");
   const shells = SHELLS.join(" ");
   if (shell === "zsh") {
     return `#compdef showem
