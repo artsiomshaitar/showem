@@ -4,8 +4,8 @@ import { join, resolve } from "node:path";
 import { version } from "../package.json";
 import { completion, isShell, SHELLS } from "./completion.ts";
 import { ensureTool } from "./deps.ts";
-import { actionDocs, overview } from "./docs.ts";
-import { loadScript, scriptJsonSchema } from "./format.ts";
+import { actionDocs, configDocs, overview } from "./docs.ts";
+import { configJsonSchema, loadScript, scriptJsonSchema } from "./format.ts";
 import { BUILD_ROOT, buildDir, initProject } from "./project.ts";
 import { record } from "./record.ts";
 import { render } from "./render.ts";
@@ -33,8 +33,8 @@ Commands:
   render   Only render, from an earlier recording
   init     Create .showem/ in the current folder, with a config.yaml to fill in
   clean    Delete every recording kept for render, to free up space
-  docs     Print the script format. \`showem docs <action>\` prints one action's fields
-  schema   Print the script format as JSON Schema, for editors
+  docs     Print the script format. \`showem docs <action>\` prints one action's fields, \`showem docs config\` the project config
+  schema   Print the script format as JSON Schema, for editors. \`showem schema config\` prints the project config's
   setup    Download the browser and ffmpeg into ~/.showem now, instead of on first use
   completion zsh|bash
            Print the shell script for tab completion
@@ -63,7 +63,7 @@ if (command === "--help" || command === "-h") {
 }
 if (command === "docs") {
   try {
-    console.log(scriptArg ? actionDocs(scriptArg) : overview());
+    console.log(scriptArg === "config" ? configDocs() : scriptArg ? actionDocs(scriptArg) : overview());
   } catch (error) {
     console.error((error as Error).message);
     process.exit(1);
@@ -104,7 +104,7 @@ if (command === "clean") {
   process.exit(0);
 }
 if (command === "schema") {
-  console.log(JSON.stringify(scriptJsonSchema(), null, 2));
+  console.log(JSON.stringify(scriptArg === "config" ? configJsonSchema() : scriptJsonSchema(), null, 2));
   process.exit(0);
 }
 if (!isCommand(command) || !scriptArg) {

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Glob } from "bun";
-import { parseScript, scriptJsonSchema } from "../src/format.ts";
+import { configJsonSchema, parseScript, scriptJsonSchema } from "../src/format.ts";
 
 const ok = (source: string) => {
   const { script, problems } = parseScript(source, "demo.yaml");
@@ -194,4 +194,10 @@ steps:
 
 test("the JSON Schema file is up to date (bun src/cli.ts schema > showem.schema.json)", async () => {
   expect(await Bun.file("showem.schema.json").json()).toEqual(JSON.parse(JSON.stringify(scriptJsonSchema())));
+});
+
+test("the config's JSON Schema file is up to date (bun src/cli.ts schema config > showem.config.schema.json)", async () => {
+  const schema = await Bun.file("showem.config.schema.json").json();
+  expect(schema).toEqual(JSON.parse(JSON.stringify(configJsonSchema())));
+  expect(Object.keys(schema.properties)).toContain("voice");
 });

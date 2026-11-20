@@ -32,7 +32,7 @@ Main rule: `render` only accepts a recording if the script still matches it (`re
 
 Update the skill with any script change: `skill/showem/SKILL.md` is the short workflow, and `skill/showem/references/` holds the details (`script.md` the script format, `project.md` the `.showem/` config, `voice.md` narration). Keep it app-agnostic.
 
-The script format lives in `format.ts` (fields, actions with their docs and examples, parsing, line numbers; `showem docs` prints them via `docs.ts`) and `script.ts` (`checkScript`, checks that need the whole script). After changing it, run `bun src/cli.ts schema > showem.schema.json`.
+The script format lives in `format.ts` (fields, actions with their docs and examples, parsing, line numbers; `showem docs` prints them via `docs.ts`) and `script.ts` (`checkScript`, checks that need the whole script). After changing it, run `bun src/cli.ts schema > showem.schema.json` and `bun src/cli.ts schema config > showem.config.schema.json`.
 
 ## Releases
 
