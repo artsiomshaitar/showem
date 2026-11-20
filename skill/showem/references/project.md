@@ -5,7 +5,7 @@ A project can keep showem's settings in a `.showem/` folder at its root. `showem
 ```
 .showem/
   config.yaml     settings every script in the project uses (committed)
-  .gitignore      keeps videos/ and .env out of git
+  .gitignore      keeps videos/ and env files out of git, except .env.example
   .env            secrets, like the voice's API key (not committed)
   videos/         where videos go when there's no --out (not committed)
 ```
