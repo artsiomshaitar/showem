@@ -21,7 +21,7 @@ Make sure the app is running and has realistic data. If it's already running, us
 
 - One message per video. Decide what the viewer should remember.
 - Do what the user asked. If they don't want to see a part, it goes between `pause-recording` and `resume-recording`. If they ask for a quick video, keep it short.
-- Keep it as short as the request allows: one scene per point the user asked to see. Each important step gets a caption of 10 words or fewer.
+- Keep it as short as the request allows: one scene per point the user asked to see. Each important step gets a caption of 10 words or fewer (one spoken sentence with a voice).
 
 ## 3. Write the script
 
@@ -44,176 +44,9 @@ EOF
 
 Always quote the marker (`<<'EOF'`), or the shell replaces `${name}` before showem sees it. Relative paths and URLs resolve from the current folder (from the script's folder when it's a file).
 
-A full script:
+Before writing steps, read [references/script.md](references/script.md): every field, how captions work, zoom, several screens, values saved during the recording, and steps that aren't recorded. For one action's fields, run `showem docs <action>`. Don't guess field names.
 
-```yaml
-url: http://localhost:3000
-viewport:
-  width: 1440
-  height: 900
-zoom: 1.8                 # the scale of `zoom: true` steps and `zoom-in`
-zoom-hold-ms: 300         # how long the camera stays zoomed after a step
-output:
-  path: demo.mp4
-  width: 2560
-  height: 1440
-  fps: 60
-  bitrate: 8              # Mbps, higher is sharper and bigger; leave it out for constant quality
-style:
-  background: /path/to/wallpaper.png
-  padding: 0.08
-  radius: 0.018
-  shadow: 0.6
-  motion-blur: 0.5        # 0 (off) to 1 (strong), only while the camera or cursor moves
-  cursor:
-    size: 1
-    travel-ms: 800
-  captions:
-    font-size: 32
-
-steps:
-  - action: wait
-    ms: 1200
-    caption: The dashboard at a glance
-
-  - action: click
-    target: text=New project
-    zoom: true
-    caption: Create a project
-
-  - action: type
-    target: "#name"
-    text: Launch plan
-    zoom: 1.6
-
-  - action: press
-    key: Enter
-
-  - action: wait-for
-    target: text=Launch plan
-
-  - action: scroll
-    y: 400
-    caption: Everything in one place
-
-  - action: wait
-    ms: 1000
-```
-
-Each step is a list item that starts with `action:`. Its other fields go on the lines below, lined up with `action:`. All names are kebab-case. Write one field per line, not `{ ... }` on one line, and put a blank line between steps.
-
-The actions are `goto`, `click`, `hover`, `drag`, `type`, `select`, `press`, `scroll`, `wait-for`, `wait`, `switch`, `save`, `zoom-in`, `zoom-out`, `pause-recording` and `resume-recording`. For the exact fields:
-
-```sh
-showem docs           # every top-level field, how steps work, and the list of actions
-showem docs click     # one action: what it does, its fields, and an example
-```
-
-Look up an action with `showem docs <action>` before using a field you're not sure about. Don't guess field names.
-
-Every step except `pause-recording` and `resume-recording` can have a `caption`. It stays on screen until the next caption. The caption shows first and the step waits until it can be read, so viewers read it and then watch what happens.
-
-- `target` is a Playwright selector: `text=Save`, `#id`, `button:has-text("Save")`, `[data-testid=x]`. Put quotes around any selector that starts with `#`, or YAML reads it as a comment.
-- `select` picks a dropdown option by its visible text (`option: Waiting on parts`). Use it for every dropdown, native `<select>` or one made of page elements: showem tells them apart and shows the menu in the video either way. For a native one, `target` is the `<select>`; otherwise it's the element that opens the dropdown.
-- `type` works on native date and time inputs too: write the value (`2:00 PM`, `2026-11-07`, `2026-11-07T14:00`) and showem types it into the input's parts. Don't press keys to move between the parts.
-- `drag` presses on `target`, moves with the button held, and lets go: over the center of another element (`to`), or a number of pixels away (`by` with `x` and `y`). Use it for anything moved or resized with the mouse: a panel edge, a window, a slider, a card dropped in another list. Target the exact thing that is grabbed (the edge handle, the title bar), not the whole panel. The drop point is measured before the drag starts and must be on screen. With `zoom`, the camera frames the whole move. Not on phone screens. Native HTML drag and drop (`draggable`) shows no dragged image in the video, since the browser draws it outside the page.
-- To show something without pointing at it, `scroll` with `target` brings it smoothly into view. Steps that point at an element already scroll to it. `y` (pixels) is for scrolling by an amount.
-- `zoom` (on click, hover, drag, type, select): `true` uses the script's `zoom` scale, a number zooms to that scale. Zoom on the steps that matter, not on every step. Close zooms are joined into one smooth pan. On a zoomed `type` step the camera follows the word being typed.
-- `keep-in-view`: a list of other elements to keep in frame with the target while zoomed, usually what the step changes (a new row, a toast). The camera zooms out below the scale if they don't fit.
-- `zoom-in` and `zoom-out`: zoom in on an element (a form, a dialog, a menu) and stay zoomed for several steps, until `zoom-out`, a `goto` or a `switch`. The camera follows the steps inside it. `keep-in-view` works on it too: list the elements to show and the camera frames them all.
-- Choosing between them: `zoom` is for a moment, `zoom-in` is for a scene. When one step is the point and the camera can pull back after it, use `zoom` on that step: it zooms in as the pointer arrives and out on its own. When the viewer should stay close for a while (several steps in one area, a pause to read something, steps like `press` or `wait` that can't zoom), use `zoom-in` and `zoom-out` around them.
-- Start with a `wait` of about 1 s so viewers see the starting state, and end with one too.
-- Use `#` comments to say what each part of the script is for.
-
-### More than one screen
-
-When a feature has two sides (one person acts, another sees the result), declare `screens` instead of `url`. Each screen is its own browser page with its own cookies, so each can be a different user. All screens run for the whole recording, so changes made on one already show on the other when the video moves to it.
-
-```yaml
-screens:
-  desk:
-    url: http://localhost:3000/orders
-    frame: browser-safari
-  phone:
-    url: http://localhost:4000/
-    frame: mobile-iphone
-
-steps:
-  - action: click
-    target: text=New order
-    caption: Create an order
-
-  - action: save
-    as: link
-    target: "#order-link"
-    attribute: href
-
-  - action: switch
-    screen: phone
-    caption: Open it on the phone
-
-  - action: goto
-    url: ${link}
-```
-
-- The first screen is on camera at the start. `switch` moves to another screen; the steps after it run there until the next `switch`. A switch keeps a short pause before and after, so there's no need for `wait` steps around it.
-- `transition`: `fade` (default) or `slide`. A slide moves to the left when going to a screen listed later in `screens`, to the right when going back.
-- `frame`: `browser-safari` (default), `browser-chrome`, `mobile-iphone` or `none`. A browser frame uses `viewport` (per screen, or the top-level one). A phone has its own screen size, so don't set `viewport` on it. Phones show taps instead of a cursor.
-- Screen names start with a letter and use letters, digits, `-` and `_`.
-
-### Values found during the recording
-
-Some values only exist once the script runs. `save` reads one and stores it under a name; any later step can use it as `${name}` in any text: URLs, typed text, targets, captions.
-
-```yaml
-# An element's attribute. href comes back as a full URL.
-- action: save
-  as: link
-  target: "#share"
-  attribute: href
-
-# An element's text.
-- action: save
-  as: id
-  target: .record-id
-
-# The current page URL, or the clipboard (after a step that copies).
-- action: save
-  as: page
-  from: url
-```
-
-Names use letters, digits and `_`. `save` takes no time in the video.
-
-### Steps that run but aren't recorded
-
-Put preparation nobody needs to watch (signing in, opening the right page, closing a banner) between `pause-recording` and `resume-recording`, like the pause button on a screen recorder:
-
-```yaml
-- action: pause-recording
-
-- action: type
-  target: "#email"
-  text: user@example.com
-
-- action: type
-  target: "#password"
-  text: demo-password
-
-- action: click
-  target: "#submit"
-
-- action: wait-for
-  target: "text=Dashboard"
-
-- action: resume-recording
-```
-
-- Paused at the start: the video begins at `resume-recording`, on the page the paused steps left behind.
-- Paused in the middle, resumed on the same screen: that stretch is cut out. Whatever the paused steps changed just appears.
-- Paused on one screen, resumed on another: a `switch` while paused prepares the other screen off camera. On resume the video moves straight to it, using the `transition` and `caption` of the last paused `switch`.
-- Paused steps run at full speed. End the paused part with a `wait-for` on something the next visible step needs.
-- Paused steps can't have captions, zoom or transitions (except that last `switch`), since they're never shown.
+Before writing, look for `.showem/config.yaml` in the project. If there is one, read [references/project.md](references/project.md): the script gets its settings from it. If the config has a `voice`, also read [references/voice.md](references/voice.md) before writing any caption, since every caption is said aloud.
 
 ## 4. Check, try, then run
 
@@ -229,13 +62,13 @@ showem run - --out /tmp/demos/invite-flow.mp4 <<'EOF'
 EOF
 ```
 
-`--out` sets where the video goes. Always pass it: use the path the user asked for, or a folder outside their project, so the video and its work files don't end up in their repo. The recording (frames and a log, which can be large) is kept next to the video in `<video>.showem/`. Without `--out`, the video goes to the script's `output.path`, or `showem.mp4` in the current folder.
+`--out` sets where the video goes. Pass it unless the project has a `.showem/` folder: use the path the user asked for, or a folder outside their project, so the video doesn't end up in their repo. In a project with `.showem/`, leave `--out` out and the video goes to `.showem/videos/`, which git ignores.
 
 `run` prints the MP4 path. Run it in the background if it's long.
 
 If the browser stopped drawing for a moment while the page was changing, `run` says which step and when, and the video jumps there. A hiccup is usually gone on the next try: record again, after putting the app's data back if the flow changed it. If it comes back at the same step, the app itself is busy there, and recording again won't help.
 
-To change only the look (style, zoom, transitions, a caption's wording with the same number of words), pass the changed script to `showem render -` with the same `--out`. It reuses the recording. Anything else needs `run`.
+To change only the look (style, zoom, transitions, a caption's wording with the same number of words), pass the changed script to `showem render -` with the same `--out`. It reuses the recording. Anything else needs `run`. With a voice, any caption change needs `run`, since the narration sets the timing.
 
 ## 5. Look at the video before handing it over
 
@@ -247,4 +80,4 @@ ffmpeg -v error -i /tmp/demos/invite-flow.mp4 -vf "fps=1/2,scale=640:-1,tile=3x2
 
 If `ffmpeg` isn't on the PATH, use the one showem downloaded: `~/.showem/ffmpeg-*/ffmpeg`.
 
-Check that every step happened, zooms land on the right element, and captions are readable. If a step failed, fix it with `showem try` and run again.
+Check that every step happened, zooms land on the right element, and captions are readable. If a step failed, fix it with `showem try` and run again. With a voice, also check that the captions read like natural speech; you can't hear the video, so tell the user it's narrated and ask them to listen.
