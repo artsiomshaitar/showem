@@ -60,7 +60,7 @@ export const ACTIONS: Record<Step["action"], ActionSpec> = {
   },
   type: {
     doc: "Click an input and type into it, one key at a time. On a native date or time input it types the value into the input's parts (day, hour, AM/PM) the way a person would.",
-    fields: { target, text: text("What to type. For a native date or time input, the value: `14:00` or `2:00 PM`, `2026-11-07`, `2026-11-07T14:00`."), "delay-ms": num("Pause between keys. Default: 60.", { min: 0 }), zoom, "keep-in-view": keepInView },
+    fields: { target, text: text("What to type. For a native date or time input, the value: `14:00` or `2:00 PM`, `2026-11-07`, `2026-11-07T14:00`."), "delay-ms": num("Pause between keys. Default: 60.", { min: 0 }), replace: bool("Replace the text the field already holds: it shows selected, then the typing replaces it. Default: the text goes after it."), zoom, "keep-in-view": keepInView },
     required: ["target", "text"],
     example: "- action: type\n  target: \"#name\"\n  text: Launch plan\n  zoom: 1.6\n  caption: Name the project",
   },
@@ -426,6 +426,11 @@ function merge(base: Record<string, unknown>, over: Record<string, unknown>): Re
     out[key] = key !== "voice" && isObject(value) && isObject(current) ? merge(current, value) : value;
   }
   return out;
+}
+
+/** JSON Schema for `config.yaml`, for editor autocomplete and inline errors. */
+export function configJsonSchema() {
+  return { $schema: "http://json-schema.org/draft-07/schema#", title: "showem config", ...jsonSchema(CONFIG) };
 }
 
 /** JSON Schema for the script format, for editor autocomplete and inline errors. */
