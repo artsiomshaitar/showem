@@ -215,6 +215,51 @@ class Clock {
 }
 
 /**
+ * Where a person clicks in a text field, relative to its box, or null for anything else: in an empty one, a little in from the
+ * left (on the first line of a multi-line one); in one with text, the middle of that text. Runs in the page.
+ */
+function textAim(el: Element): Point | null {
+  const textTypes = ["text", "search", "email", "url", "tel", "password", "number"];
+  const input = el instanceof HTMLInputElement && textTypes.includes(el.type) ? el : null;
+  const area = el instanceof HTMLTextAreaElement ? el : null;
+  const editable = el instanceof HTMLElement && el.isContentEditable ? el : null;
+  if (!input && !area && !editable) return null;
+  const s = getComputedStyle(el);
+  const r = el.getBoundingClientRect();
+  const px = (v: string) => parseFloat(v) || 0;
+  const left = px(s.paddingLeft) + px(s.borderLeftWidth);
+  const top = px(s.paddingTop) + px(s.borderTopWidth);
+  const fontSize = px(s.fontSize);
+  const lineHeight = px(s.lineHeight) || fontSize * 1.2;
+  const width = r.width - left - px(s.paddingRight) - px(s.borderRightWidth);
+  const text = input?.value ?? area?.value ?? editable?.innerText.trim() ?? "";
+  const lines = text ? text.split("\n") : [];
+  const measure = document.createElement("canvas").getContext("2d")!;
+  measure.font = s.font;
+  const lineWidth = (line: string) => (input?.type === "password" ? line.length * fontSize * 0.6 : measure.measureText(line).width);
+  const textWidth = Math.min(width, Math.max(0, ...lines.map(lineWidth)));
+  const x = left + (textWidth ? textWidth / 2 : Math.min(fontSize * 1.5, width / 2));
+  if (input) return { x, y: r.height / 2 };
+  const shownLines = Math.max(1, Math.min(lines.length, Math.floor((r.height - top) / lineHeight)));
+  return { x, y: Math.min(top + (shownLines * lineHeight) / 2, r.height / 2) };
+}
+
+/** Puts the caret at the end of a text field's text. Runs in the page. */
+function caretToEnd(el: Element) {
+  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+    try {
+      el.setSelectionRange(el.value.length, el.value.length);
+    } catch {
+      // Inputs like number and email have no selection to set.
+    }
+  } else if (el instanceof HTMLElement && el.isContentEditable) {
+    const selection = getSelection();
+    selection?.selectAllChildren(el);
+    selection?.collapseToEnd();
+  }
+}
+
+/**
  * Drives one screen's page and logs everything the planner needs: pointer path, clicks, caret, step timing.
  * On a touch screen there is no pointer travel: each tap jumps straight to its spot.
  */
@@ -410,8 +455,11 @@ export class Director {
     return union(boxes);
   }
 
+  /** Where the pointer goes on `target`: its center, or for a text field, where a person clicks to type (see `textAim`). */
   private async pointOf(target: string) {
-    return center(await this.boxOf(target));
+    const box = await this.boxOf(target);
+    const aim = await this.page.locator(target).first().evaluate(textAim).catch(() => null);
+    return aim ? { x: box.x + aim.x, y: box.y + aim.y } : center(box);
   }
 
   /** Brings the element into view, smoothly unless off camera, and returns its box. */
@@ -576,6 +624,8 @@ export class Director {
     if (dateType) return this.typeDate(input, dateType, text, delayMs);
     const caret = async () => ({ t: this.now(), ...(await input.evaluate(caretOf, MIRRORED_STYLES)) });
     log.inputBox = (await input.boundingBox()) ?? undefined;
+    // The click may have landed inside text already there; typing adds to the end of it.
+    await input.evaluate(caretToEnd);
     log.caret = [await caret()];
     for (const ch of text) {
       await this.page.keyboard.type(ch);

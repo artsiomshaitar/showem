@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { dateKeys, record } from "../src/record.ts";
 import { resolveScript } from "../src/script.ts";
 import { tryScript } from "../src/try.ts";
-import type { Script, Step } from "../src/types.ts";
+import type { Point, Script, Step } from "../src/types.ts";
 
 let dir: string;
 
@@ -68,4 +68,45 @@ test("try skips wait steps, and says so when a step right after one fails", asyn
   expect(Date.now() - started).toBeLessThan(20_000);
   const failed = await tryScript(scriptOf([{ action: "wait", ms: 30_000 }, { action: "click", target: "#missing" }]), join(dir, "try"));
   expect(failed.failed).toMatchObject({ step: 1, afterWait: true });
+}, 60_000);
+
+test("the pointer clicks text fields where a person would, and typing adds to the end of their text", async () => {
+  await Bun.write(
+    join(dir, "fields.html"),
+    `<body style="margin:0;font:16px sans-serif">
+<input id="empty" style="display:block;width:600px;height:40px;padding:0 10px;font:16px sans-serif">
+<input id="filled" value="Hello" style="display:block;width:600px;height:40px;padding:0 10px;font:16px sans-serif">
+<textarea id="area" style="display:block;width:600px;height:200px;padding:10px;font:16px/20px sans-serif"></textarea>
+<button id="go" style="display:block;width:600px;height:40px">Go</button></body>`,
+  );
+  const script = resolveScript(
+    {
+      url: "./fields.html",
+      viewport: { width: 640, height: 400 },
+      deviceScaleFactor: 1,
+      steps: [
+        { action: "click", target: "#empty" },
+        { action: "type", target: "#filled", text: " world" },
+        { action: "click", target: "#area" },
+        { action: "click", target: "#go" },
+        { action: "save", as: "filled", target: "#filled", attribute: "value" },
+      ],
+    },
+    join(dir, "fields.yaml"),
+  ).script;
+  const rec = await record(script, join(dir, "fields-work"));
+  const [empty, filled, area, go] = rec.steps.map((s) => s.point!) as [Point, Point, Point, Point];
+  // Empty: a little in from the left edge, vertically centered.
+  expect(empty.x).toBeGreaterThan(10);
+  expect(empty.x).toBeLessThan(50);
+  expect(empty.y).toBeCloseTo(20, 0);
+  // With text: over the middle of "Hello", not the middle of the field.
+  expect(filled.x).toBeGreaterThan(15);
+  expect(filled.x).toBeLessThan(40);
+  // A textarea: its first line, near the top-left.
+  expect(area.x).toBeLessThan(60);
+  expect(area.y - 80).toBeLessThan(35);
+  // Anything else: the center.
+  expect(go.x).toBeCloseTo(300, 0);
+  expect(rec.vars.filled).toBe("Hello world");
 }, 60_000);
