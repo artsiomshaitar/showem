@@ -42,9 +42,9 @@ const ZOOM_IN_MS = 800;
 /** How long a select's menu stays open before the pointer moves to the option, and after it clicks it. */
 const MENU_OPEN_MS = 350;
 const MENU_PICK_MS = 200;
-/** How long the result of a captioned step stays on screen before the next step starts. */
 /** How long text a `type` step replaces shows selected before the first key. */
 const SELECTED_MS = 400;
+/** How long the result of a captioned step stays on screen before the next step starts. */
 const CAPTION_HOLD_MS = 600;
 /** Quiet between one said caption and the next, like a narrator's breath between sentences. */
 const VOICE_GAP_MS = 500;
@@ -68,6 +68,7 @@ const STALL_NEXT_FRAME_MS = 120;
 type SaveStep = Extract<Step, { action: "save" }>;
 type DragStep = Extract<Step, { action: "drag" }>;
 type SelectStep = Extract<Step, { action: "select" }>;
+type TypeStep = Extract<Step, { action: "type" }>;
 type NativeSelect = { options: string[]; selected: number; popup: boolean; fontSize: number };
 
 /** The select's options if `loc` is a native `<select>`, or null for a dropdown made of page elements. */
@@ -246,19 +247,23 @@ function textAim(el: Element): Point | null {
   return { x, y: Math.min(top + (shownLines * lineHeight) / 2, r.height / 2) };
 }
 
-/** Puts the caret at the end of a text field's text, or with `replace`, selects all of it so typing replaces it. Runs in the page. */
-function placeCaret(el: Element, replace: boolean) {
+type CaretPlace = "start" | "end" | "all";
+
+/** Puts the caret at the start or end of a text field's text, or selects all of it so typing replaces it. Runs in the page. */
+function placeCaret(el: Element, place: CaretPlace) {
   if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+    const end = el.value.length;
     try {
-      el.setSelectionRange(replace ? 0 : el.value.length, el.value.length);
+      el.setSelectionRange(place === "end" ? end : 0, place === "start" ? 0 : end);
     } catch {
       // Inputs like number and email have no selection to set.
-      if (replace) el.select();
+      if (place === "all") el.select();
     }
   } else if (el instanceof HTMLElement && el.isContentEditable) {
     const selection = getSelection();
     selection?.selectAllChildren(el);
-    if (!replace) selection?.collapseToEnd();
+    if (place === "start") selection?.collapseToStart();
+    if (place === "end") selection?.collapseToEnd();
   }
 }
 
@@ -373,8 +378,9 @@ export class Director {
         const dateType = await dateInputType(loc);
         if (dateType) await loc.fill(dateKeys(dateType, step.text).value);
         else {
-          await loc.evaluate(placeCaret, step.replace ?? false);
+          await loc.evaluate<void, CaretPlace>(placeCaret, step.replace ? "all" : "end");
           await page.keyboard.type(step.text);
+          if (step.replace && !step.text) await page.keyboard.press("Backspace");
         }
         break;
       }
@@ -623,7 +629,7 @@ export class Director {
     if (real) await this.page.mouse.up();
   }
 
-  private async type(step: Extract<Step, { action: "type" }>, log: StepLog) {
+  private async type(step: TypeStep, log: StepLog) {
     const { text, replace = false } = step;
     const delayMs = step.delayMs ?? KEY_DELAY_MS;
     await Bun.sleep(BEFORE_TYPING_MS);
@@ -632,10 +638,16 @@ export class Director {
     if (dateType) return this.typeDate(input, dateType, text, delayMs);
     const caret = async () => ({ t: this.now(), ...(await input.evaluate(caretOf, MIRRORED_STYLES)) });
     log.inputBox = (await input.boundingBox()) ?? undefined;
-    // The click may have landed inside text already there: typing goes after it, or replaces it, shown selected first.
-    await input.evaluate(placeCaret, replace);
-    if (replace) await Bun.sleep(SELECTED_MS);
+    // The click may have landed inside text already there: typing goes after it, or with `replace`, over it.
+    // Then the first caret is measured at the start, where the new text begins, before the old text shows selected.
+    await input.evaluate<void, CaretPlace>(placeCaret, replace ? "start" : "end");
     log.caret = [await caret()];
+    if (replace) {
+      await input.evaluate<void, CaretPlace>(placeCaret, "all");
+      await Bun.sleep(SELECTED_MS);
+      // Typing nothing would leave the old text selected.
+      if (!text) await this.page.keyboard.press("Backspace");
+    }
     for (const ch of text) {
       await this.page.keyboard.type(ch);
       log.caret.push(await caret());
