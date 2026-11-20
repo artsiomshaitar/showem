@@ -31,7 +31,7 @@ export type Step = StepBase &
     | ({ action: "click"; target: string } & Zoomable)
     | ({ action: "hover"; target: string } & Zoomable)
     | ({ action: "drag"; target: string; durationMs?: number } & ({ to: string } | { by: Partial<Point> }) & Zoomable)
-    | ({ action: "type"; target: string; text: string; delayMs?: number } & Zoomable)
+    | ({ action: "type"; target: string; text: string; delayMs?: number; replace?: boolean } & Zoomable)
     | ({ action: "select"; target: string; option: string } & Zoomable)
     | { action: "zoom-in"; target: string; scale?: number; keepInView?: string[] }
     | { action: "zoom-out" }

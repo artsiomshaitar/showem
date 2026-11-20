@@ -43,6 +43,8 @@ const ZOOM_IN_MS = 800;
 const MENU_OPEN_MS = 350;
 const MENU_PICK_MS = 200;
 /** How long the result of a captioned step stays on screen before the next step starts. */
+/** How long text a `type` step replaces shows selected before the first key. */
+const SELECTED_MS = 400;
 const CAPTION_HOLD_MS = 600;
 /** Quiet between one said caption and the next, like a narrator's breath between sentences. */
 const VOICE_GAP_MS = 500;
@@ -244,18 +246,19 @@ function textAim(el: Element): Point | null {
   return { x, y: Math.min(top + (shownLines * lineHeight) / 2, r.height / 2) };
 }
 
-/** Puts the caret at the end of a text field's text. Runs in the page. */
-function caretToEnd(el: Element) {
+/** Puts the caret at the end of a text field's text, or with `replace`, selects all of it so typing replaces it. Runs in the page. */
+function placeCaret(el: Element, replace: boolean) {
   if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
     try {
-      el.setSelectionRange(el.value.length, el.value.length);
+      el.setSelectionRange(replace ? 0 : el.value.length, el.value.length);
     } catch {
       // Inputs like number and email have no selection to set.
+      if (replace) el.select();
     }
   } else if (el instanceof HTMLElement && el.isContentEditable) {
     const selection = getSelection();
     selection?.selectAllChildren(el);
-    selection?.collapseToEnd();
+    if (!replace) selection?.collapseToEnd();
   }
 }
 
@@ -307,7 +310,7 @@ export class Director {
         await this.approach(log.point, log);
         if (step.action === "hover") break;
         await this.press(log.point);
-        if (step.action === "type") await this.type(step.target, step.text, step.delayMs ?? KEY_DELAY_MS, log);
+        if (step.action === "type") await this.type(step, log);
         break;
       }
       case "drag":
@@ -369,7 +372,10 @@ export class Director {
         if (step.action !== "type") break;
         const dateType = await dateInputType(loc);
         if (dateType) await loc.fill(dateKeys(dateType, step.text).value);
-        else await page.keyboard.type(step.text);
+        else {
+          await loc.evaluate(placeCaret, step.replace ?? false);
+          await page.keyboard.type(step.text);
+        }
         break;
       }
       case "hover":
@@ -617,15 +623,18 @@ export class Director {
     if (real) await this.page.mouse.up();
   }
 
-  private async type(target: string, text: string, delayMs: number, log: StepLog) {
+  private async type(step: Extract<Step, { action: "type" }>, log: StepLog) {
+    const { text, replace = false } = step;
+    const delayMs = step.delayMs ?? KEY_DELAY_MS;
     await Bun.sleep(BEFORE_TYPING_MS);
-    const input = this.page.locator(target).first();
+    const input = this.page.locator(step.target).first();
     const dateType = await dateInputType(input);
     if (dateType) return this.typeDate(input, dateType, text, delayMs);
     const caret = async () => ({ t: this.now(), ...(await input.evaluate(caretOf, MIRRORED_STYLES)) });
     log.inputBox = (await input.boundingBox()) ?? undefined;
-    // The click may have landed inside text already there; typing adds to the end of it.
-    await input.evaluate(caretToEnd);
+    // The click may have landed inside text already there: typing goes after it, or replaces it, shown selected first.
+    await input.evaluate(placeCaret, replace);
+    if (replace) await Bun.sleep(SELECTED_MS);
     log.caret = [await caret()];
     for (const ch of text) {
       await this.page.keyboard.type(ch);

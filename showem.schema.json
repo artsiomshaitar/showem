@@ -397,6 +397,10 @@
                 "minimum": 0,
                 "description": "Pause between keys. Default: 60."
               },
+              "replace": {
+                "type": "boolean",
+                "description": "Replace the text the field already holds: it shows selected, then the typing replaces it. Default: the text goes after it."
+              },
               "zoom": {
                 "anyOf": [
                   {

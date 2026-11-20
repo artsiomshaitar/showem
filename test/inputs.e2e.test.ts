@@ -83,14 +83,16 @@ test("try skips wait steps, and says so when a step right after one fails", asyn
   expect(failed.failed).toMatchObject({ step: 1, afterWait: true });
 }, 60_000);
 
-test("the pointer clicks text fields where a person would, and typing adds to the end of their text", async () => {
+test("the pointer clicks text fields where a person would, and typing adds to their text or replaces it", async () => {
   await Bun.write(
     join(dir, "fields.html"),
     `<body style="margin:0;font:16px sans-serif">
 <input id="empty" style="display:block;width:600px;height:40px;padding:0 10px;font:16px sans-serif">
 <input id="filled" value="Hello" style="display:block;width:600px;height:40px;padding:0 10px;font:16px sans-serif">
 <textarea id="area" style="display:block;width:600px;height:200px;padding:10px;font:16px/20px sans-serif"></textarea>
-<button id="go" style="display:block;width:600px;height:40px">Go</button></body>`,
+<button id="go" style="display:block;width:600px;height:40px">Go</button>
+<input id="amount" value="22700" style="display:block;width:200px;height:40px">
+<input id="quiet" value="old" style="display:block;width:200px;height:40px"></body>`,
   );
   const script = resolveScript(
     {
@@ -103,6 +105,12 @@ test("the pointer clicks text fields where a person would, and typing adds to th
         { action: "click", target: "#area" },
         { action: "click", target: "#go" },
         { action: "save", as: "filled", target: "#filled", attribute: "value" },
+        { action: "type", target: "#amount", text: "22500", replace: true },
+        { action: "save", as: "amount", target: "#amount", attribute: "value" },
+        { action: "pause-recording" },
+        { action: "type", target: "#quiet", text: "new", replace: true },
+        { action: "resume-recording" },
+        { action: "save", as: "quiet", target: "#quiet", attribute: "value" },
       ],
     },
     join(dir, "fields.yaml"),
@@ -122,4 +130,7 @@ test("the pointer clicks text fields where a person would, and typing adds to th
   // Anything else: the center.
   expect(go.x).toBeCloseTo(300, 0);
   expect(rec.vars.filled).toBe("Hello world");
+  expect(rec.vars.amount).toBe("22500");
+  // Off camera too.
+  expect(rec.vars.quiet).toBe("new");
 }, 60_000);
