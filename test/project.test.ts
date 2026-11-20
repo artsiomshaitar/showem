@@ -14,7 +14,7 @@ afterEach(() => rm(dir, { recursive: true, force: true }));
 test("init creates the config, ignores videos and .env, and won't overwrite them", async () => {
   await initProject(dir);
   expect(await readFile(join(dir, ".showem/config.yaml"), "utf8")).toContain("# style:");
-  expect(await readFile(join(dir, ".showem/.gitignore"), "utf8")).toBe("videos/\n.env\n");
+  expect(await readFile(join(dir, ".showem/.gitignore"), "utf8")).toBe("videos/\n.env*\n!.env.example\n");
   expect(parseConfig(await readFile(join(dir, ".showem/config.yaml"), "utf8"), "config.yaml")).toEqual({ config: {}, problems: [] });
   expect(initProject(dir)).rejects.toThrow("already exists");
 });

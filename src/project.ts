@@ -37,7 +37,7 @@ export function findProject(dir: string): string | undefined {
 /** Where the recording and render parts for a video go, named after the video's full path. */
 export const buildDir = (outPath: string) => join(BUILD_ROOT, `${basename(outPath)}-${Bun.hash(outPath).toString(36)}`);
 
-/** Creates `.showem/` in `dir` with a config to fill in, and keeps its videos and `.env` out of git. */
+/** Creates `.showem/` in `dir` with a config to fill in, and keeps its videos and env files out of git, except an `.env.example`. */
 export async function initProject(dir: string) {
   const root = join(dir, PROJECT_DIR);
   if (root === SHOWEM_HOME) throw new Error(`${SHOWEM_HOME} holds showem's browser and ffmpeg. Run init in a project folder.`);
@@ -45,6 +45,6 @@ export async function initProject(dir: string) {
   if (existsSync(config)) throw new Error(`${join(PROJECT_DIR, CONFIG_FILE)} already exists`);
   await Bun.write(config, CONFIG_TEMPLATE);
   const gitignore = join(root, ".gitignore");
-  if (!existsSync(gitignore)) await Bun.write(gitignore, "videos/\n.env\n");
+  if (!existsSync(gitignore)) await Bun.write(gitignore, "videos/\n.env*\n!.env.example\n");
   return root;
 }

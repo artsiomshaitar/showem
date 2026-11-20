@@ -7,7 +7,7 @@ An example project set up for showem: a small app in `src/`, demo scripts in `de
   config.yaml         settings every demo uses (background, video size), committed
   backgrounds/        images the config points to, committed
   .env                secrets like ELEVENLABS_API_KEY, not committed
-  .gitignore          keeps videos/ and .env out of git
+  .gitignore          keeps videos/ and env files out of git, except .env.example
   videos/             where the videos go, not committed
 demos/                one script per video
 src/                  the app
