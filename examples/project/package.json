@@ -1,0 +1,8 @@
+{
+  "name": "notes-app",
+  "private": true,
+  "scripts": {
+    "demo": "showem run demos/new-note.yaml",
+    "demo:launch": "showem run demos/launch.yaml"
+  }
+}

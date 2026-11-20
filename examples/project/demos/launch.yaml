@@ -1,0 +1,20 @@
+# A one-off: a different background for the launch post. Padding and size still come from the config.
+url: ../src/index.html
+viewport:
+  width: 1280
+  height: 760
+style:
+  background: ../art/launch.jpg
+
+steps:
+  - action: wait
+    ms: 800
+    caption: Notes is out today
+
+  - action: click
+    target: text=Ideas
+    zoom: true
+    caption: Everything you planned, in one list
+
+  - action: wait
+    ms: 1000

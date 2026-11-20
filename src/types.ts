@@ -79,6 +79,19 @@ export interface Script {
     cursor?: { size?: number; travelMs?: number };
     captions?: { fontSize?: number };
   };
+  /** Narration, from the config. `apiKey` is the `${{ env.NAME }}` reference, not the key. */
+  voice?: {
+    /** A known service; without it, `baseUrl` is a server with OpenAI's speech API. */
+    provider?: "elevenlabs" | "openai" | "openrouter";
+    baseUrl?: string;
+    voice: string;
+    model?: string;
+    apiKey?: string;
+    instructions?: string;
+    /** Request fields sent as they are. */
+    extra?: Record<string, string | number>;
+    audioTags?: boolean;
+  };
   steps: Step[];
 }
 
@@ -163,4 +176,12 @@ export interface Recording {
   steps: StepLog[];
   vars: Record<string, string>;
   stalls?: Stall[];
+  voice?: VoiceClip[];
+}
+
+/** A caption read aloud: the audio file, played from `start` (recording time). */
+export interface VoiceClip {
+  step: number;
+  file: string;
+  start: number;
 }

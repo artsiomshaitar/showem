@@ -3,7 +3,7 @@ import { TAP_LEAD_MS } from "./device.ts";
 import { CAPTION_FADE_MS } from "./draw.ts";
 import { clamp, lerp } from "./geometry.ts";
 import { layout, type Layout } from "./layout.ts";
-import { fillVars, hiddenSteps, isPhone, recordingKey } from "./script.ts";
+import { fillVars, hiddenSteps, isPhone, recordingKey, shownCaption } from "./script.ts";
 import { indexAt, itemAt } from "./timeline.ts";
 import type { Recording, ScreenRecording, Script, Transition } from "./types.ts";
 
@@ -100,7 +100,8 @@ export function buildTap(screen: ScreenRecording): (t: number) => TapState | und
 export function buildCaptions(script: Script, rec: Recording): Caption[] {
   const hidden = hiddenSteps(script);
   const marks = rec.steps.flatMap((log) => {
-    const text = hidden.has(log.index) ? undefined : script.steps[log.index]?.caption;
+    const caption = hidden.has(log.index) ? undefined : script.steps[log.index]?.caption;
+    const text = caption && shownCaption(script, caption);
     return text ? [{ text: fillVars(text, rec.vars), start: log.start }] : [];
   });
   return marks.map((mark, i) => ({ ...mark, end: marks[i + 1]?.start ?? rec.duration - CAPTION_FADE_MS }));
@@ -124,6 +125,7 @@ export function sceneAt(script: Script, rec: Recording, t: number): Scene {
 }
 
 export function plan(script: Script, rec: Recording): Plan {
+  const captions = buildCaptions(script, rec);
   const screens = Object.fromEntries(
     Object.entries(rec.screens).map(([name, screen]): [string, ScreenPlan] => {
       const touch = isPhone(screen.frame);
@@ -139,5 +141,5 @@ export function plan(script: Script, rec: Recording): Plan {
       }];
     }),
   );
-  return { screens, scene: (t) => sceneAt(script, rec, t), captions: buildCaptions(script, rec) };
+  return { screens, scene: (t) => sceneAt(script, rec, t), captions };
 }

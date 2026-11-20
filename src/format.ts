@@ -1,6 +1,9 @@
-import { join, resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { parseEnv } from "node:util";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { isMap, isScalar, isSeq, LineCounter, parseDocument, type Node } from "yaml";
-import { check, describe, didYouMean, isObject, jsonSchema, list, num, object, oneOf, text, type Issue, type Path, type Schema } from "./schema.ts";
+import { bool, check, describe, didYouMean, isObject, jsonSchema, list, num, object, oneOf, text, type Issue, type Path, type Schema } from "./schema.ts";
+import { CONFIG_FILE, findProject, GLOBAL_CONFIG } from "./project.ts";
 import { checkScript, resolveScript } from "./script.ts";
 import { FRAMES, TRANSITIONS, type Script, type Step } from "./types.ts";
 
@@ -12,7 +15,7 @@ const zoom: Schema = {
   doc: "Zoom in on the target: `true` uses the script's `zoom` scale, a number zooms to that scale.",
 };
 const keepInView = list(target, "Other elements to keep in frame with the target while zoomed, usually what the step changes (a new row, a toast). Needs `zoom`.");
-const caption = text("Text shown before the step runs, until the next caption. The step waits until it can be read.");
+const caption = text("Text shown before the step runs, until the next caption. The step waits until it can be read. With a voice it's also said, and `[audio tags]` in it are performed but not shown.");
 const size = (what: string) => object({ width: num(undefined, { min: 1 }), height: num(undefined, { min: 1 }) }, ["width", "height"], what);
 
 export interface ActionSpec {
@@ -161,7 +164,7 @@ export const TOP = object({
   "zoom-hold-ms": num("How long the camera stays zoomed after a step ends. Default: 300.", { min: 0 }),
   output: object(
     {
-      path: text("Where to write the video. `--out` on the command line overrides it. Default: the script's name with .mp4, or showem.mp4 for a script from stdin."),
+      path: text("Where to write the video. `--out` on the command line overrides it. Default: the script's name with .mp4 (showem.mp4 for a script from stdin), in the project's `.showem/videos/`, or next to the script outside a project."),
       width: num("Default: 2560.", { min: 1 }),
       height: num("Default: 1440.", { min: 1 }),
       fps: num("Default: 60.", { min: 1 }),
@@ -184,6 +187,33 @@ export const TOP = object({
     "How the video looks. Changing it only needs `showem render`.",
   ),
 });
+
+const { url: _url, screens: _screens, output, ...shared } = TOP.fields;
+const { path: _path, ...outputFields } = (output as Extract<Schema, { kind: "object" }>).fields;
+/** A project's or the user's `config.yaml`: the script's fields that make sense for every script. */
+export const CONFIG = object({
+  ...shared,
+  output: object(outputFields, [], "The video file. Each script sets its own path."),
+  voice: object(
+    {
+      provider: oneOf(["elevenlabs", "openai", "openrouter"], "A service showem knows: elevenlabs, openai or openrouter. For any other server with OpenAI's speech API (Kokoro, Qwen3-TTS, Chatterbox, LiteLLM), leave it out and set `base-url`."),
+      "base-url": text("Instead of `provider`: the API root of a server with OpenAI's speech API, like http://localhost:8880/v1. showem sends each caption to <base-url>/audio/speech."),
+      model: text("The model. Required, except with elevenlabs (default: eleven_v4)."),
+      voice: text("The voice: an ElevenLabs voice id, or one of the model's voice names."),
+      "api-key": text("`${{ env.NAME }}`: the variable with the key, set in `.showem/.env`, the project's `.env` or the environment. Never the key itself. Required with `provider`, optional with `base-url`."),
+      instructions: text("How to speak, in one line, for models that take it (like OpenAI's gpt-4o-mini-tts): \"Warm, relaxed product narrator\". Not with elevenlabs, which uses `[audio tags]` instead."),
+      extra: { kind: "named", values: { kind: "either", options: [text(), num()], expected: "text or a number" }, doc: "More fields for each request, sent as they are, for options a server has beyond the usual ones. Example: `instruct: Warm narrator` and `temperature: 0.3` for mlx-audio's Qwen3-TTS." },
+      "audio-tags": bool("Whether the model performs `[audio tags]` in captions. When false they're taken out before the caption is said. Default: true for ElevenLabs v3 and v4 models, false for everything else."),
+    },
+    ["voice"],
+    "Narration read aloud over the video.",
+  ),
+});
+
+export type Config = Omit<Script, "url" | "screens" | "steps">;
+
+/** `${{ env.NAME }}`, GitHub Actions style. */
+const ENV_REF = /^\$\{\{\s*env\.(\w+)\s*\}\}$/;
 
 export const fieldsOf = (name: string, spec: ActionSpec) => object({ action: oneOf([name]), ...spec.fields, ...(spec.fields && { caption }) }, ["action", ...(spec.required ?? [])]);
 
@@ -210,11 +240,11 @@ function readStep(raw: unknown, path: Path, issues: Issue[]): Step | undefined {
 }
 
 /** Checks the parsed script, returning it in the internal shape and every problem found, each with the path where it is. */
-function readScript(raw: unknown): { script: Script; issues: Issue[] } {
+function readScript(raw: unknown): { value: Script; issues: Issue[] } {
   const issues: Issue[] = [];
   if (!isObject(raw)) {
     issues.push({ path: [], message: `the script must be a group of fields with \`steps\`, not ${describe(raw)}` });
-    return { script: { steps: [] }, issues };
+    return { value: { steps: [] }, issues };
   }
   const { steps, ...rest } = raw;
   const { $schema: _, ...top } = check(TOP, rest, [], issues) as Omit<Script, "steps"> & { $schema?: string };
@@ -223,14 +253,14 @@ function readScript(raw: unknown): { script: Script; issues: Issue[] } {
   const read = (Array.isArray(steps) ? steps : []).map((step, i) => readStep(step, ["steps", i], issues));
   const script: Script = { ...top, steps: read.filter((step) => step !== undefined) };
   // With a step missing, pauses and saved values can't be followed, so those checks wait until every step can be read.
-  if (read.length !== script.steps.length) return { script, issues };
+  if (read.length !== script.steps.length) return { value: script, issues };
   const broken = new Set(issues.flatMap((issue) => (issue.path[0] === "steps" && typeof issue.path[1] === "number" ? [issue.path[1]] : [])));
   for (const p of checkScript(script)) {
     if (p.step === undefined) issues.push({ path: [], message: p.message });
     // A step with a wrong field gets that error only, not a second one caused by it.
     else if (!broken.has(p.step)) issues.push({ path: ["steps", p.step], message: p.message });
   }
-  return { script, issues };
+  return { value: script, issues };
 }
 
 /** Finds where `path` is in the document: the line of its key, or of the item in a list. */
@@ -263,16 +293,54 @@ function quoteHint(node: Node | undefined): string {
 
 /** Reads a YAML or JSON script and checks it. Problems come as `name:line step N (action): message` lines. `stepAt` names a step the same way. */
 export function parseScript(source: string, name: string): { script: Script; problems: string[]; stepAt: (index: number) => string } {
+  const { value, ...rest } = parseYaml(source, name, readScript, { steps: [] });
+  return { script: value, ...rest };
+}
+
+/** Reads a `config.yaml` and checks it. An empty one, or one with only comments, sets nothing. `env` looks up the variable the API key is in; without it, the key isn't looked up. */
+export function parseConfig(source: string, name: string, env?: (name: string) => string | undefined): { config: Config; apiKey?: string; problems: string[] } {
+  const { value, problems } = parseYaml(source, name, (raw) => readConfig(raw, env), { config: {} });
+  return { ...value, problems };
+}
+
+/** The API key is kept apart from the config, so it never ends up in files the config is written to. */
+function readConfig(raw: unknown, env: ((name: string) => string | undefined) | undefined): { value: { config: Config; apiKey?: string }; issues: Issue[] } {
+  const issues: Issue[] = [];
+  if (raw === null) return { value: { config: {} }, issues };
+  if (!isObject(raw)) return { value: { config: {} }, issues: [{ path: [], message: `the config must be a group of fields, not ${describe(raw)}` }] };
+  const { $schema: _, ...config } = (check(CONFIG, raw, [], issues) ?? {}) as Config & { $schema?: string };
+  const voice = config.voice;
+  if (voice) {
+    const { provider } = voice;
+    if (!provider && !voice.baseUrl) issues.push({ path: ["voice"], message: `"voice" needs "provider" (elevenlabs, openai or openrouter), or "base-url" for any other server` });
+    if (provider && voice.baseUrl) issues.push({ path: ["voice", "base-url"], message: `"${provider}" already knows its address. Remove "base-url", or remove "provider" to use another server` });
+    if (provider !== "elevenlabs" && !voice.model) issues.push({ path: ["voice"], message: `"voice" needs "model"` });
+    if (provider && voice.apiKey === undefined) issues.push({ path: ["voice"], message: `"${provider}" needs "api-key", like \${{ env.API_KEY }}, with the key in .showem/.env` });
+    if (provider === "elevenlabs" && voice.instructions) issues.push({ path: ["voice", "instructions"], message: `"instructions" doesn't work with elevenlabs. Use [audio tags] in captions instead` });
+  }
+  const ref = voice?.apiKey;
+  if (ref === undefined) return { value: { config }, issues };
+  const path = ["voice", "api-key"];
+  const variable = ref.match(ENV_REF)?.[1];
+  // The value isn't repeated in the message, in case it's a key.
+  if (!variable) issues.push({ path, message: `"api-key" must name a variable, like \${{ env.ELEVENLABS_API_KEY }}, with the key in .showem/.env. Don't put the key itself in the config` });
+  if (!variable || !env) return { value: { config }, issues };
+  const apiKey = env(variable);
+  if (!apiKey) issues.push({ path, message: `${variable} isn't set. Add it to .showem/.env or the environment` });
+  return { value: { config, apiKey: apiKey || undefined }, issues };
+}
+
+function parseYaml<T>(source: string, name: string, read: (raw: unknown) => { value: T; issues: Issue[] }, empty: T) {
   const lines = new LineCounter();
   const doc = parseDocument(source, { lineCounter: lines, prettyErrors: false });
   const lineAt = (offset: number) => lines.linePos(offset).line;
   if (doc.errors.length) {
     const error = doc.errors[0]!;
     const line = lineAt(error.pos[0]);
-    return { script: { steps: [] }, problems: [`${name}:${line}: ${error.message}${parseHint(source, line)}`, count(1)], stepAt: () => name };
+    return { value: empty, problems: [`${name}:${line}: ${error.message}${parseHint(source, line)}`, count(1)], stepAt: () => name };
   }
   const raw: unknown = doc.toJS();
-  const { script, issues } = readScript(raw);
+  const { value, issues } = read(raw);
   const steps = isObject(raw) && Array.isArray(raw.steps) ? raw.steps : [];
   const where = (line: number, index: number | undefined) => `${name}${line ? `:${line}` : ""}${index === undefined ? "" : ` step ${index + 1}${stepName(steps[index])}`}`;
   const problems = issues
@@ -288,7 +356,7 @@ export function parseScript(source: string, name: string): { script: Script; pro
     const { offset } = locate(doc.contents, ["steps", index]);
     return where(offset === undefined ? 0 : lineAt(offset), index);
   };
-  return { script, problems: problems.length ? [...problems, count(problems.length)] : [], stepAt };
+  return { value, problems: problems.length ? [...problems, count(problems.length)] : [], stepAt };
 }
 
 /** Most broken YAML in a script is a value that needs quotes, or step fields indented more than `action:`. */
@@ -306,14 +374,58 @@ function stepName(raw: unknown) {
   return action ? ` (${action})` : "";
 }
 
-/** Reads a script from a file, or from stdin when `arg` is `-`. Relative paths in a script from stdin resolve from the current folder. */
-export async function loadScript(arg: string) {
+/**
+ * Reads a script from a file, or from stdin when `arg` is `-`. Relative paths in a script from stdin resolve from the current folder.
+ * The script's fields win over the project's `.showem/config.yaml`, which wins over `~/.showem/config.yaml`.
+ * With `needKey`, a voice's API key has to be set; only recording uses it.
+ */
+export async function loadScript(arg: string, needKey = false) {
   const stdin = arg === "-";
   const path = stdin ? join(process.cwd(), "showem.yaml") : resolve(arg);
+  const project = findProject(dirname(path));
+  const env = needKey ? await readEnv(project) : undefined;
+  const configs = await Promise.all([GLOBAL_CONFIG, project && join(project, CONFIG_FILE)].map((p) => loadConfig(p, env)));
+  const configProblems = configs.flatMap((c) => c.problems);
+  if (configProblems.length) return { problems: configProblems };
   const source = stdin ? await Bun.stdin.text() : await Bun.file(path).text();
   const { script, problems, stepAt } = parseScript(source, stdin ? "<stdin>" : arg);
   if (problems.length) return { problems };
-  return { problems, stepAt, ...resolveScript(script, path) };
+  const combined = combine(configs, script);
+  return { problems, stepAt, apiKey: combined.apiKey, ...resolveScript(combined.script, path, project && join(project, "videos")) };
+}
+
+/**
+ * The configs (global first) and the script as one: later fields win, and groups of fields merge field by field.
+ * A voice comes whole from one config, key included, so a key is only ever sent to the service it was set up for.
+ */
+export function combine(configs: readonly { config: Config; apiKey?: string }[], script: Script) {
+  const merged = [...configs.map((c) => c.config), script].reduce((base, over) => merge(base, over)) as Script;
+  return { script: merged, apiKey: configs.findLast((c) => c.config.voice)?.apiKey };
+}
+
+async function loadConfig(path: string | undefined, env: ((name: string) => string | undefined) | undefined): Promise<{ config: Config; apiKey?: string; problems: string[] }> {
+  if (!path || !existsSync(path)) return { config: {}, problems: [] };
+  const loaded = parseConfig(await Bun.file(path).text(), relative(process.cwd(), path), env);
+  const background = loaded.config.style?.background;
+  if (background && !isAbsolute(background)) loaded.config.style!.background = resolve(dirname(path), background);
+  return loaded;
+}
+
+/** Looks a variable up in the environment, then in `.showem/.env`, then in the `.env` next to `.showem/`. */
+async function readEnv(project: string | undefined) {
+  const files = project ? [join(project, ".env"), join(dirname(project), ".env")] : [];
+  const vars = await Promise.all(files.map(async (file) => (existsSync(file) ? parseEnv(await Bun.file(file).text()) : {})));
+  return (name: string) => process.env[name] || vars.map((v) => v[name]).find(Boolean);
+}
+
+/** `over`'s fields replace `base`'s, and groups of fields merge field by field, except `voice`. */
+function merge(base: Record<string, unknown>, over: Record<string, unknown>): Record<string, unknown> {
+  const out = { ...base };
+  for (const [key, value] of Object.entries(over)) {
+    const current = out[key];
+    out[key] = key !== "voice" && isObject(value) && isObject(current) ? merge(current, value) : value;
+  }
+  return out;
 }
 
 /** JSON Schema for the script format, for editor autocomplete and inline errors. */

@@ -1,0 +1,39 @@
+# Uses the project's background, size and voice from .showem/config.yaml.
+url: ../src/index.html
+viewport:
+  width: 1280
+  height: 760
+
+steps:
+  - action: wait
+    ms: 1000
+    caption: "[warmly] Here are all your notes, in one place."
+
+  - action: click
+    target: "#new"
+    zoom: true
+    caption: Let's start a new note.
+
+  - action: type
+    target: "#title"
+    text: Launch checklist
+    zoom: true
+    caption: First, give it a title.
+
+  - action: type
+    target: "#body"
+    text: Record the demo, write the post, ship it.
+    caption: Then just write... it saves as you type.
+
+  - action: type
+    target: "#tag"
+    text: launch
+    caption: Tag it so it's easy to find.
+
+  - action: click
+    target: "#add-tag"
+    caption: Then add the tag.
+
+  - action: wait
+    ms: 1000
+    caption: "[cheerfully] That's it. Your note is ready."

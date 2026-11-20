@@ -41,6 +41,24 @@ export function concatList(paths: readonly string[]) {
   return paths.map((p) => `file '${p.replaceAll("'", "'\\''")}'\n`).join("");
 }
 
+/**
+ * Copies the video and adds a sound track with each clip starting at its time in ms.
+ * Every clip is brought to the same loudness first, since a voice model can whisper one line and shout the next.
+ */
+export async function addAudio(videoPath: string, clips: readonly { file: string; start: number }[], outPath: string) {
+  const delayed = clips.map((c, i) => `[${i + 1}:a]loudnorm=I=-16:TP=-1.5:LRA=11,aresample=44100,adelay=${Math.round(c.start)}:all=1[a${i}]`);
+  const mix = `${clips.map((_, i) => `[a${i}]`).join("")}amix=inputs=${clips.length}:normalize=0[audio]`;
+  const proc = Bun.spawn(
+    [
+      toolPath("ffmpeg"), "-y", "-loglevel", "error", "-i", videoPath, ...clips.flatMap((c) => ["-i", c.file]),
+      "-filter_complex", [...delayed, mix].join(";"),
+      "-map", "0:v", "-map", "[audio]", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", outPath,
+    ],
+    { stdout: "inherit", stderr: "inherit" },
+  );
+  await expectSuccess(proc, "ffmpeg audio");
+}
+
 export async function concatVideos(parts: readonly string[], listPath: string, outPath: string) {
   await Bun.write(listPath, concatList(parts));
   const proc = Bun.spawn(
