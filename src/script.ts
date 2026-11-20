@@ -184,7 +184,10 @@ function resolveUrl(url: string, baseDir: string) {
   return /^[a-z][a-z0-9+.-]*:/i.test(url) ? url : pathToFileURL(resolve(baseDir, url)).href;
 }
 
-/** Resolves every relative path and URL in a script against the folder the script lives in. Without `output.path`, the video goes to `videosDir`, or next to the script. */
+/**
+ * Resolves the relative paths and starting URLs in a script against the folder the script lives in. A `goto` URL stays
+ * as written: it's relative to the page it's opened from. Without `output.path`, the video goes to `videosDir`, or next to the script.
+ */
 export function resolveScript(script: Script, scriptPath: string, videosDir?: string): { script: Script; outPath: string } {
   const dir = dirname(scriptPath);
   const fromDir = (path: string) => (isAbsolute(path) ? path : resolve(dir, path));
@@ -196,8 +199,6 @@ export function resolveScript(script: Script, scriptPath: string, videosDir?: st
       ...script.style,
       background: script.style.background && fromDir(script.style.background),
     },
-    // A URL with a saved value in it is resolved while recording, against the page it opens from.
-    steps: script.steps.map((step) => (step.action === "goto" && !step.url.includes("${") ? { ...step, url: resolveUrl(step.url, dir) } : step)),
   };
   const name = `${basename(scriptPath, extname(scriptPath))}.mp4`;
   const outPath = script.output?.path ? fromDir(script.output.path) : join(videosDir ?? dir, name);

@@ -61,6 +61,19 @@ test("type fills native date and time inputs part by part, and scroll brings a t
   expect(again.end - again.start).toBeLessThan(2500);
 }, 60_000);
 
+test("a goto path opens on the page's own site", async () => {
+  const server = Bun.serve({ port: 0, fetch: (req) => new Response(`<h1>${new URL(req.url).pathname}</h1>`, { headers: { "content-type": "text/html" } }) });
+  try {
+    const script = resolveScript(
+      { url: `http://localhost:${server.port}/start`, viewport: { width: 640, height: 400 }, deviceScaleFactor: 1, steps: [{ action: "goto", url: "/settings/team" }, { action: "wait-for", target: 'h1:has-text("/settings/team")' }] },
+      join(dir, "goto.yaml"),
+    ).script;
+    expect((await tryScript(script, join(dir, "goto-try"))).failed).toBeUndefined();
+  } finally {
+    server.stop(true);
+  }
+}, 60_000);
+
 test("try skips wait steps, and says so when a step right after one fails", async () => {
   const started = Date.now();
   const ok = await tryScript(scriptOf([{ action: "wait", ms: 30_000 }, { action: "type", target: "#time", text: "14:00" }, { action: "scroll", target: "#far" }]), join(dir, "try"));
