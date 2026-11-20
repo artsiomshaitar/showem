@@ -142,8 +142,18 @@ test("an action lands as its caption is said, the next caption waits for the voi
 
   const out = join(dir, "out.mp4");
   await render(script, rec, join(dir, "work"), out);
-  const log = Bun.spawnSync([await ensureTool("ffmpeg"), "-hide_banner", "-i", out, "-map", "0:a", "-f", "null", "-"]).stderr.toString();
+  const ffmpeg = await ensureTool("ffmpeg");
+  const log = Bun.spawnSync([ffmpeg, "-hide_banner", "-i", out, "-map", "0:a", "-f", "null", "-"]).stderr.toString();
   expect(log).toContain("Audio: aac");
+  // Every AAC frame lasts 1024 samples. With broken timestamps they last one tick, and players lose the sound after a seek.
+  const frames = Bun.spawnSync([ffmpeg, "-v", "error", "-i", out, "-map", "0:a", "-c", "copy", "-f", "framecrc", "-"]).stdout.toString().split("\n").filter((l) => /^\d/.test(l));
+  expect(frames.slice(0, -1).every((l) => l.split(",")[3]!.trim() === "1024")).toBe(true);
+  // The sound lasts as long as the video, silent after the last clip.
+  const samples = Bun.spawnSync([ffmpeg, "-v", "error", "-i", out, "-map", "0:a", "-f", "s16le", "-ac", "1", "-ar", "8000", "-"]).stdout.length / 2;
+  expect(Math.abs(samples / 8 - rec.duration)).toBeLessThan(150);
+  // Seeking into the clip still finds the voice.
+  const seeked = Bun.spawnSync([ffmpeg, "-v", "error", "-ss", "1", "-i", out, "-map", "0:a", "-f", "s16le", "-"]).stdout;
+  expect(seeked.length).toBeGreaterThan(0);
 }, 60_000);
 
 test("a caption with a saved value is read when its step comes, without the wait showing in the video", async () => {
