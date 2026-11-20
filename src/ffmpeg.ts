@@ -44,15 +44,18 @@ export function concatList(paths: readonly string[]) {
 /**
  * Copies the video and adds a sound track with each clip starting at its time in ms.
  * Every clip is brought to the same loudness first, since a voice model can whisper one line and shout the next.
+ * loudnorm leaves its frames with broken timestamps (each AAC frame then lasts one tick, and players lose the sound
+ * after a seek), so they're counted again from the samples once the clip is in place. The track is padded with silence
+ * to the end of the video: one that stops early crackles where it runs out.
  */
 export async function addAudio(videoPath: string, clips: readonly { file: string; start: number }[], outPath: string) {
-  const delayed = clips.map((c, i) => `[${i + 1}:a]loudnorm=I=-16:TP=-1.5:LRA=11,aresample=44100,adelay=${Math.round(c.start)}:all=1[a${i}]`);
-  const mix = `${clips.map((_, i) => `[a${i}]`).join("")}amix=inputs=${clips.length}:normalize=0[audio]`;
+  const delayed = clips.map((c, i) => `[${i + 1}:a]loudnorm=I=-16:TP=-1.5:LRA=11,aresample=44100,adelay=${Math.round(c.start)}:all=1,asetpts=N/SR/TB[a${i}]`);
+  const mix = `${clips.map((_, i) => `[a${i}]`).join("")}amix=inputs=${clips.length}:normalize=0,apad[audio]`;
   const proc = Bun.spawn(
     [
       toolPath("ffmpeg"), "-y", "-loglevel", "error", "-i", videoPath, ...clips.flatMap((c) => ["-i", c.file]),
       "-filter_complex", [...delayed, mix].join(";"),
-      "-map", "0:v", "-map", "[audio]", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", outPath,
+      "-map", "0:v", "-map", "[audio]", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-shortest", "-movflags", "+faststart", outPath,
     ],
     { stdout: "inherit", stderr: "inherit" },
   );
