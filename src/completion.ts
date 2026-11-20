@@ -21,6 +21,7 @@ _showem() {
   fi
   case $words[2] in
     docs) (( CURRENT == 3 )) && compadd -- ${actions} ;;
+    schema) (( CURRENT == 3 )) && compadd -- config ;;
     completion) (( CURRENT == 3 )) && compadd -- ${shells} ;;
     check) _files -g '*.(yaml|yml|json)' ;;
     ${OUT_COMMANDS.join("|")})
@@ -48,6 +49,7 @@ fi
   fi
   case \${COMP_WORDS[1]} in
     docs) (( COMP_CWORD == 2 )) && COMPREPLY=($(compgen -W "${actions}" -- "$cur")) ;;
+    schema) (( COMP_CWORD == 2 )) && COMPREPLY=($(compgen -W "config" -- "$cur")) ;;
     completion) (( COMP_CWORD == 2 )) && COMPREPLY=($(compgen -W "${shells}" -- "$cur")) ;;
     check) COMPREPLY=($(compgen -f -- "$cur")) ;;
     ${OUT_COMMANDS.join("|")})

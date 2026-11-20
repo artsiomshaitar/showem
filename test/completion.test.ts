@@ -23,6 +23,7 @@ words=(${words.map((w) => `'${w}'`).join(" ")}); CURRENT=${words.length}; _showe
 test("bash completes commands, docs actions, shells and --out", () => {
   expect(bash("showem", "d")).toBe("docs");
   expect(bash("showem", "docs", "cl")).toBe("click");
+  expect(bash("showem", "schema", "c")).toBe("config");
   expect(bash("showem", "completion", "b")).toBe("bash");
   expect(bash("showem", "run", "--o")).toBe("--out");
   expect(bash("showem", "check", "--o")).toBe("");

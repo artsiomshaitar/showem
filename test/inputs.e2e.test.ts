@@ -92,7 +92,8 @@ test("the pointer clicks text fields where a person would, and typing adds to th
 <textarea id="area" style="display:block;width:600px;height:200px;padding:10px;font:16px/20px sans-serif"></textarea>
 <button id="go" style="display:block;width:600px;height:40px">Go</button>
 <input id="amount" value="22700" style="display:block;width:200px;height:40px">
-<input id="quiet" value="old" style="display:block;width:200px;height:40px"></body>`,
+<input id="quiet" value="old" style="display:block;width:200px;height:40px">
+<input id="clear" value="old" style="display:block;width:200px;height:40px"></body>`,
   );
   const script = resolveScript(
     {
@@ -111,6 +112,8 @@ test("the pointer clicks text fields where a person would, and typing adds to th
         { action: "type", target: "#quiet", text: "new", replace: true },
         { action: "resume-recording" },
         { action: "save", as: "quiet", target: "#quiet", attribute: "value" },
+        { action: "type", target: "#clear", text: "", replace: true },
+        { action: "save", as: "clear", target: "#clear", attribute: "value" },
       ],
     },
     join(dir, "fields.yaml"),
@@ -131,6 +134,10 @@ test("the pointer clicks text fields where a person would, and typing adds to th
   expect(go.x).toBeCloseTo(300, 0);
   expect(rec.vars.filled).toBe("Hello world");
   expect(rec.vars.amount).toBe("22500");
+  // The camera follows the new text from the start of the field, not from the end of the text it replaces.
+  const replaced = rec.steps[5]!.caret!;
+  expect(replaced[0]!.x).toBeLessThan(replaced.at(-1)!.x);
+  expect(rec.vars.clear).toBe("");
   // Off camera too.
   expect(rec.vars.quiet).toBe("new");
 }, 60_000);
