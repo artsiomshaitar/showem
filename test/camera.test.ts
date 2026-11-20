@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { buildCamera, chainShots, fitScale, frameOn, wordFocus, type Shot } from "../src/camera.ts";
+import { buildCamera, buildLifts, chainShots, fitScale, frameOn, wordFocus, type Shot } from "../src/camera.ts";
+import { captionBox } from "../src/draw.ts";
+import { captionSize } from "../src/layout.ts";
 import { layout } from "../src/layout.ts";
 import type { Step } from "../src/types.ts";
 import { MAIN, makeRecording, makeScript, VIEWPORT } from "./fixtures.ts";
@@ -78,6 +80,25 @@ describe("frameOn", () => {
     const inside = frameOn(l, VIEWPORT, 2, { x: 300, y: 200 });
     expect(corner.cx).toBeGreaterThan(0);
     expect(corner.cx).toBeLessThan(inside.cx);
+  });
+
+  test("with captions, a zoomed focus lands in the middle of the part above the caption", () => {
+    const captioned = layout(makeScript({ steps: [{ action: "wait", ms: 1, caption: "Hi" }] }), MAIN);
+    expect(captioned.captionTop).toBeLessThan(captioned.height);
+    expect(l.captionTop).toBe(l.height);
+    const focus = { x: 720, y: 450 };
+    const cam = frameOn(captioned, VIEWPORT, 2, focus);
+    // Where the focus ends up on the canvas: the camera's point is at the canvas center.
+    const onCanvas = captioned.height / 2 + (focus.y - cam.cy * VIEWPORT.height) * 2 * captioned.fit;
+    expect(onCanvas).toBeCloseTo(captioned.captionTop / 2);
+    // At 1× there's no room to move, so the window stays where it is.
+    expect(frameOn(captioned, VIEWPORT, 1, focus)).toEqual(frameOn(l, VIEWPORT, 1, focus));
+  });
+
+  test("with captions, a box must fit above the caption", () => {
+    const captioned = layout(makeScript({ steps: [{ action: "wait", ms: 1, caption: "Hi" }] }), MAIN);
+    const tall = { x: 0, y: 0, width: 100, height: 600 };
+    expect(fitScale(3, tall, captioned)).toBeLessThan(fitScale(3, tall, l));
   });
 
   test("while typing, it stays inside the input when the input is wider than the view", () => {
@@ -178,5 +199,35 @@ describe("zoom-in", () => {
   test("ends at a page change", () => {
     const navigated = buildCamera(script, makeRecording(script, { steps: logs, duration: 9000 }, { urls: [{ t: 0, url: "a" }, { t: 2500, url: "b" }] }), "main", l);
     expect(navigated(3500).scale).toBeLessThan(1.2);
+  });
+});
+
+describe("buildLifts", () => {
+  const script = makeScript({ steps: [{ action: "click", target: "#a", caption: "Then add the tag." }, { action: "click", target: "#b", caption: "Then add the tag." }] });
+  const lay = layout(script, MAIN);
+  const caption = { text: "Then add the tag.", start: 0, end: 4000 };
+  const box = captionBox(lay, caption.text, captionSize(script));
+  const wide = () => frameOn(lay, VIEWPORT, 1, { x: VIEWPORT.width / 2, y: VIEWPORT.height / 2 });
+  const clickAt = (point: { x: number; y: number }, actionAt = 1000, index = 0) => ({ index, screen: "main", start: actionAt - 500, end: actionAt + 200, actionAt, point });
+  const lifts = (steps: ReturnType<typeof clickAt>[], captions = [caption]) => buildLifts(script, makeRecording(script, { steps }), "main", lay, captions, wide);
+
+  test("lifts the window just clear of the caption when the step's target is behind it", () => {
+    const [lift] = lifts([clickAt({ x: VIEWPORT.width / 2, y: VIEWPORT.height - 10 })]);
+    expect(lift).toBeDefined();
+    // The bottom of what the pointer touches, lifted, sits above the caption.
+    const bottom = lay.page.y + (VIEWPORT.height - 10 + 30) * lay.fit;
+    expect(bottom - lift!.lift).toBeLessThan(box.y);
+    expect(lift!.from).toBe(500);
+  });
+
+  test("doesn't lift for a target beside the caption, above it, or with no caption showing", () => {
+    expect(lifts([clickAt({ x: 40, y: VIEWPORT.height - 10 })])).toEqual([]);
+    expect(lifts([clickAt({ x: VIEWPORT.width / 2, y: 100 })])).toEqual([]);
+    expect(lifts([clickAt({ x: VIEWPORT.width / 2, y: VIEWPORT.height - 10 })], [])).toEqual([]);
+  });
+
+  test("joins lifts close in time, so the window doesn't bob between them", () => {
+    const bottom = { x: VIEWPORT.width / 2, y: VIEWPORT.height - 10 };
+    expect(lifts([clickAt(bottom, 1000, 0), clickAt(bottom, 2000, 1)])).toHaveLength(1);
   });
 });

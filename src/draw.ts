@@ -1,6 +1,6 @@
 import { basename } from "node:path";
 import { createCanvas, loadImage, Path2D, type Canvas, type Image, type SKRSContext2D } from "@napi-rs/canvas";
-import type { Layout } from "./layout.ts";
+import { captionGap, captionHeight, type Layout } from "./layout.ts";
 import type { Caption } from "./plan.ts";
 import { clamp } from "./geometry.ts";
 import { easeInOutCubic } from "./motion.ts";
@@ -422,22 +422,31 @@ function wrap(ctx: SKRSContext2D, text: string, maxWidth: number) {
   return lines;
 }
 
+/** A caption's lines and where its box sits on the canvas, measured with `ctx`. */
+function placeCaption(ctx: SKRSContext2D, layout: Layout, text: string, fontSize: number) {
+  ctx.font = `600 ${fontSize}px ${CAPTION_FONT}`;
+  const lines = wrap(ctx, text, Math.min(layout.width, layout.height) * 0.9);
+  const width = Math.max(...lines.map((l) => ctx.measureText(l).width)) + fontSize * 1.6;
+  const height = captionHeight(fontSize, lines.length);
+  // Placed by the canvas, not the window, so it stays put while the video switches screens.
+  return { lines, box: { x: layout.width / 2 - width / 2, y: layout.height - captionGap(layout.height, layout.padding) - height, width, height } };
+}
+
+const measuring = createCanvas(1, 1).getContext("2d");
+
+/** Where a caption's box sits on the canvas. */
+export const captionBox = (layout: Layout, text: string, fontSize: number): Box => placeCaption(measuring, layout, text, fontSize).box;
+
 export function drawCaption(ctx: SKRSContext2D, layout: Layout, caption: Caption, t: number, fontSize: number) {
   const alpha = Math.max(0, Math.min(1, (t - caption.start) / CAPTION_FADE_MS, (caption.end - t) / CAPTION_FADE_MS));
   ctx.save();
   ctx.globalAlpha = alpha;
-  ctx.font = `600 ${fontSize}px ${CAPTION_FONT}`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  const lines = wrap(ctx, caption.text, Math.min(layout.width, layout.height) * 0.9);
+  const { lines, box: placed } = placeCaption(ctx, layout, caption.text, fontSize);
   const lineHeight = fontSize * 1.3;
-  const padX = fontSize * 0.8;
   const padY = fontSize * 0.5;
-  const width = Math.max(...lines.map((l) => ctx.measureText(l).width)) + padX * 2;
-  const height = lines.length * lineHeight + padY * 2;
-  const rise = (1 - alpha) * fontSize * 0.3;
-  // Placed by the canvas, not the window, so it stays put while the video switches screens.
-  const box = { x: layout.width / 2 - width / 2, y: layout.height - layout.padding - height - layout.height * 0.04 + rise, width, height };
+  const box = { ...placed, y: placed.y + (1 - alpha) * fontSize * 0.3 };
   ctx.fillStyle = "rgba(10,10,14,0.72)";
   roundedBox(ctx, box, fontSize * 0.45);
   ctx.fill();

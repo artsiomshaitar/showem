@@ -134,7 +134,7 @@ export function plan(script: Script, rec: Recording): Plan {
       return [name, {
         layout: l,
         touch,
-        camera: buildCamera(script, rec, name, l),
+        camera: buildCamera(script, rec, name, l, captions),
         cursor: buildCursor(screen, touch),
         tap: buildTap(screen),
         isTyping: (t) => typing.some((span) => t >= span.start && t < span.end),
