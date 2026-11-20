@@ -1,7 +1,7 @@
-import { mkdir } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, rm } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { ensureTool } from "./deps.ts";
-import { concatVideos, expectSuccess } from "./ffmpeg.ts";
+import { addAudio, concatVideos, expectSuccess } from "./ffmpeg.ts";
 import type { FrameJob } from "./frames.ts";
 import { assertRecordingMatches } from "./plan.ts";
 import { RENDER_WORKER_COMMAND } from "./render-worker.ts";
@@ -37,6 +37,7 @@ export async function render(script: Script, rec: Recording, dir: string, outPat
   const ranges = splitFrames(total, Math.min(navigator.hardwareConcurrency - 1, Math.ceil(total / MIN_FRAMES_PER_WORKER)));
   const partsDir = join(dir, "parts");
   await mkdir(partsDir, { recursive: true });
+  await mkdir(dirname(outPath), { recursive: true });
 
   const jobs: FrameJob[] = ranges.map(([from, to], k) => ({ script, rec, dir, from, to, outPath: join(partsDir, `${k}.mp4`) }));
   const workers = await Promise.all(jobs.map(async (job, k) => {
@@ -59,5 +60,10 @@ export async function render(script: Script, rec: Recording, dir: string, outPat
     throw err;
   }
 
-  await concatVideos(jobs.map((job) => job.outPath), join(partsDir, "list.txt"), outPath);
+  const voice = rec.voice ?? [];
+  for (const clip of voice) if (!(await Bun.file(clip.file).exists())) throw new Error(`The voice clip for step ${clip.step + 1} is gone from ${dirname(clip.file)}. Record again with \`showem run\`.`);
+  const video = voice.length ? join(partsDir, "video.mp4") : outPath;
+  await concatVideos(jobs.map((job) => job.outPath), join(partsDir, "list.txt"), video);
+  if (voice.length) await addAudio(video, voice, outPath);
+  await rm(partsDir, { recursive: true, force: true });
 }

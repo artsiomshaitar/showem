@@ -1,4 +1,4 @@
-import { basename, dirname, extname, isAbsolute, resolve } from "node:path";
+import { basename, dirname, extname, isAbsolute, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { PHONE_VIEWPORT } from "./device.ts";
 import { clamp } from "./geometry.ts";
@@ -184,8 +184,8 @@ function resolveUrl(url: string, baseDir: string) {
   return /^[a-z][a-z0-9+.-]*:/i.test(url) ? url : pathToFileURL(resolve(baseDir, url)).href;
 }
 
-/** Resolves every relative path and URL in a script against the folder the script lives in. */
-export function resolveScript(script: Script, scriptPath: string): { script: Script; outPath: string } {
+/** Resolves every relative path and URL in a script against the folder the script lives in. Without `output.path`, the video goes to `videosDir`, or next to the script. */
+export function resolveScript(script: Script, scriptPath: string, videosDir?: string): { script: Script; outPath: string } {
   const dir = dirname(scriptPath);
   const fromDir = (path: string) => (isAbsolute(path) ? path : resolve(dir, path));
   const resolved: Script = {
@@ -199,9 +199,19 @@ export function resolveScript(script: Script, scriptPath: string): { script: Scr
     // A URL with a saved value in it is resolved while recording, against the page it opens from.
     steps: script.steps.map((step) => (step.action === "goto" && !step.url.includes("${") ? { ...step, url: resolveUrl(step.url, dir) } : step)),
   };
-  const outPath = fromDir(script.output?.path ?? `${basename(scriptPath, extname(scriptPath))}.mp4`);
+  const name = `${basename(scriptPath, extname(scriptPath))}.mp4`;
+  const outPath = script.output?.path ? fromDir(script.output.path) : join(videosDir ?? dir, name);
   return { script: resolved, outPath };
 }
+
+/** `[excited]`-style audio tags in a caption: the voice performs them, the video never shows them. */
+const AUDIO_TAG = /\s*\[[^\]\n]*\]\s*/g;
+
+/** The text without its audio tags. */
+export const withoutTags = (text: string) => text.replace(AUDIO_TAG, " ").replace(/ ([.,!?…])/g, "$1").trim();
+
+/** The caption as it appears on screen: with a voice, its brackets are audio tags and don't show. */
+export const shownCaption = (script: Script, caption: string) => (script.voice ? withoutTags(caption) : caption);
 
 /** Average adult silent reading speed in English (Brysbaert, 2019). */
 const READING_WPM = 238;
@@ -234,7 +244,13 @@ export function stepsKey(steps: readonly Step[], hidden: ReadonlySet<number> = n
   );
 }
 
-/** Identifies everything that changes what gets recorded: the screens and the steps. */
+/** Identifies everything that changes what gets recorded: the screens, the steps and, with a voice, every caption's words. */
 export function recordingKey(script: Script): string {
-  return JSON.stringify([screensOf(script), JSON.parse(stepsKey(script.steps, hiddenSteps(script)))]);
+  const key: unknown[] = [screensOf(script), JSON.parse(stepsKey(script.steps, hiddenSteps(script)))];
+  // A step waits until its caption has been said, so the wording and the voice change the timing.
+  if (script.voice) {
+    const { apiKey: _, ...voice } = script.voice;
+    key.push({ voice, captions: script.steps.map((s) => s.caption ?? null) });
+  }
+  return JSON.stringify(key);
 }

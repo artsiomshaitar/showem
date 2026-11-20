@@ -29,6 +29,8 @@ for (const target of TARGETS) {
     // chromium-bidi and electron are only needed for browsers showem doesn't use.
     external: ["chromium-bidi/*", "electron"],
     plugins: [inlinePlaywrightJson],
+    // The stand-in voice API is for testing from source only. Release binaries never read it.
+    define: { "process.env.SHOWEM_VOICE_API": "undefined" },
   });
   if (!result.success) throw new AggregateError(result.logs, `Build for ${target} failed`);
   await $`tar -czf dist/showem-${target}.tar.gz -C ${dir} showem`;

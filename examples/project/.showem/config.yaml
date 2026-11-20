@@ -1,0 +1,16 @@
+# Settings for every showem script in this project. A script's own fields win over these.
+# Paths are relative to this folder. `showem docs` describes each field.
+# Secrets go in .showem/.env (git ignores it), and the config names them: ${{ env.NAME }}.
+
+style:
+  background: backgrounds/brand.jpg
+  padding: 0.07
+output:
+  width: 2560
+  height: 1440
+  bitrate: 40
+voice:
+  provider: elevenlabs
+  voice: bIHbv24MWmeRgasZH58o   # Will
+  model: eleven_v4
+  api-key: ${{ env.ELEVENLABS_API_KEY }}

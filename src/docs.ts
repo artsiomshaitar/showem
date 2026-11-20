@@ -17,6 +17,8 @@ function typeName(schema: Schema): string {
       return "number";
     case "true":
       return "true";
+    case "boolean":
+      return "true or false";
     case "either":
       return schema.options.map(typeName).join(" | ");
     case "list":

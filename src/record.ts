@@ -7,8 +7,9 @@ import { TAP_LEAD_MS } from "./device.ts";
 import { center, clamp, lerp, union } from "./geometry.ts";
 import { menuLayout, rowBox } from "./menu.ts";
 import { cursorPath, easeInOutCubic, TRANSITION_MS, travelMs } from "./motion.ts";
-import { fillStep, isPhone, NOTICE_MS, pausesOf, readingMs, recordingKey, screensOf, styleOf, type Pause } from "./script.ts";
-import type { Box, Frame, Point, Recording, Sample, Script, ScreenRecording, Size, Stall, Step, StepLog, Switch } from "./types.ts";
+import { fillStep, hiddenSteps, isPhone, NOTICE_MS, pausesOf, readingMs, recordingKey, screensOf, styleOf, type Pause } from "./script.ts";
+import type { Box, Frame, Point, Recording, Sample, Script, ScreenRecording, Size, Stall, Step, StepLog, Switch, VoiceClip } from "./types.ts";
+import type { Around, Clip, Speak } from "./voice.ts";
 
 const DEFAULT_SCALE_FACTOR = 3;
 const JPEG_QUALITY = 98;
@@ -43,6 +44,17 @@ const MENU_OPEN_MS = 350;
 const MENU_PICK_MS = 200;
 /** How long the result of a captioned step stays on screen before the next step starts. */
 const CAPTION_HOLD_MS = 600;
+/** Quiet between one said caption and the next, like a narrator's breath between sentences. */
+const VOICE_GAP_MS = 500;
+/**
+ * With a voice, an action starts this long before its caption has been said, so the pointer arrives as the sentence ends.
+ * Viewers follow best when words and what they describe happen together (Mayer's temporal contiguity), and a silent
+ * caption has to be read before the eyes are free, but a heard one doesn't.
+ */
+const ACTION_LEAD_MS = 800;
+
+/** How long a caption takes: to read, or to say and breathe after. */
+const captionMs = (caption: string | undefined, clip: Clip | undefined) => (!caption ? 0 : clip ? clip.ms + VOICE_GAP_MS : readingMs(caption));
 /** A gap between two animation frames longer than this means the browser stopped drawing for a moment. */
 const STALL_MS = 100;
 /** The last frame drawn before such a gap can reach the screencast this long after the gap starts. */
@@ -617,9 +629,26 @@ export function openScreens(browser: Browser, script: Script, scaleFactor: numbe
   );
 }
 
-export async function record(script: Script, dir: string): Promise<Recording> {
+/** With `speak`, each shown caption is read aloud and its step waits until it has been said. */
+export async function record(script: Script, dir: string, speak?: Speak): Promise<Recording> {
   const framesDir = join(dir, "frames");
   await rm(framesDir, { recursive: true, force: true });
+
+  const hidden = hiddenSteps(script);
+  const clips = new Map<number, Clip>();
+  const shown = script.steps.flatMap((s, i) => (!hidden.has(i) && s.caption ? [i] : []));
+  const knownCaption = (i: number | undefined) => {
+    const caption = i === undefined ? undefined : script.steps[i]?.caption;
+    return caption?.includes("${") ? undefined : caption;
+  };
+  const around = (i: number): Around => ({ previous: knownCaption(shown[shown.indexOf(i) - 1]), next: knownCaption(shown[shown.indexOf(i) + 1]) });
+  // Before the browser starts, so a wrong key or voice stops the run early. One at a time: ElevenLabs plans limit how many run at once.
+  if (speak) {
+    for (const i of shown) {
+      const caption = knownCaption(i);
+      if (caption) await speak(caption, around(i));
+    }
+  }
 
   // The screencast only sends device pixels when the scale is forced for the whole browser, so all screens share it.
   const scaleFactor = script.deviceScaleFactor ?? DEFAULT_SCALE_FACTOR;
@@ -676,6 +705,14 @@ export async function record(script: Script, dir: string): Promise<Recording> {
     const steps: StepLog[] = [];
     for (const [index, original] of script.steps.entries()) {
       const step = fillStep(original, vars);
+      // A caption with a saved value is only read aloud now; the clock stops meanwhile, so the wait isn't in the video.
+      // A switch while paused was already timed by its reading time, so it stays silent.
+      if (speak && step.caption && !hidden.has(index) && !clips.has(index) && !clock.paused) {
+        const known = knownCaption(index) !== undefined;
+        if (!known) clock.pause();
+        clips.set(index, await speak(step.caption, around(index)));
+        if (!known) clock.resume();
+      }
       if (index === leadInAt) {
         await Bun.sleep(LEAD_IN_MS);
         firstScreen = active;
@@ -687,7 +724,10 @@ export async function record(script: Script, dir: string): Promise<Recording> {
         const step = pause.switchStep;
         if (step !== undefined) {
           const caption = script.steps[step]?.caption;
-          const reading = caption ? readingMs(caption) : 0;
+          const known = knownCaption(step);
+          const clip = speak && known ? await speak(known, around(step)) : undefined;
+          if (clip) clips.set(step, clip);
+          const reading = captionMs(caption, clip);
           await Bun.sleep(BEFORE_SWITCH_MS);
           const captionAt = now();
           if (reading) await Bun.sleep(NOTICE_MS);
@@ -724,9 +764,12 @@ export async function record(script: Script, dir: string): Promise<Recording> {
         }
       } else {
         // A caption shows first and the step waits until it has been read, so the viewer can watch what happens next.
+        // A said caption only gets a head start: the action lands as the sentence ends.
         // On a switch the caption only needs to be noticed before the slide; the rest is read during and after it.
-        const reading = step.caption ? readingMs(step.caption) : 0;
-        if (step.action !== "switch") await Bun.sleep(step.action === "wait" ? Math.max(0, reading - step.ms) : reading);
+        const clip = clips.get(index);
+        const reading = captionMs(step.caption, clip);
+        const acts = step.action !== "wait" && step.action !== "wait-for" && step.action !== "save";
+        if (step.action !== "switch") await Bun.sleep(step.action === "wait" ? Math.max(0, reading - step.ms) : clip && acts ? Math.max(NOTICE_MS, clip.ms - ACTION_LEAD_MS) : reading);
         if (step.action === "switch") {
           if (step.screen !== active) {
             const leave = log.start;
@@ -746,7 +789,10 @@ export async function record(script: Script, dir: string): Promise<Recording> {
           vars[step.as] = await director.save(step);
         } else {
           await director.run(step, log);
-          if (step.action !== "wait" && step.action !== "wait-for") await Bun.sleep(step.caption ? CAPTION_HOLD_MS : SETTLE_MS);
+          // The next caption waits until this one has been said.
+          const saying = clip ? log.start + reading - now() : 0;
+          if (step.action !== "wait" && step.action !== "wait-for") await Bun.sleep(Math.max(step.caption ? CAPTION_HOLD_MS : SETTLE_MS, saying));
+          else if (saying > 0) await Bun.sleep(saying);
           if ("keepInView" in step && step.keepInView?.length) {
             const kept = await director.shotBox(step.target, step.keepInView);
             log.shotBox = union([log.shotBox, kept].filter((box) => box !== undefined));
@@ -775,6 +821,8 @@ export async function record(script: Script, dir: string): Promise<Recording> {
       if (step) stalls.push({ screen, step: step.index, t, ms: Math.round(ms) });
     }
     for (const s of live) for (const f of s.frames) f.t = Math.max(0, clock.at(f.t));
+    // Said from when its caption shows.
+    const voice: VoiceClip[] = [...clips].map(([step, clip]) => ({ step, file: clip.file, start: steps.find((l) => l.index === step)!.start }));
 
     const recording: Recording = {
       key: recordingKey(script),
@@ -790,6 +838,7 @@ export async function record(script: Script, dir: string): Promise<Recording> {
       steps,
       vars,
       ...(stalls.length && { stalls }),
+      ...(voice.length && { voice }),
     };
     await Bun.write(join(dir, "recording.json"), JSON.stringify(recording, null, 2));
     return recording;

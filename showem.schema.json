@@ -99,7 +99,7 @@
       "properties": {
         "path": {
           "type": "string",
-          "description": "Where to write the video. `--out` on the command line overrides it. Default: the script's name with .mp4, or showem.mp4 for a script from stdin."
+          "description": "Where to write the video. `--out` on the command line overrides it. Default: the script's name with .mp4 (showem.mp4 for a script from stdin), in the project's `.showem/videos/`, or next to the script outside a project."
         },
         "width": {
           "type": "number",
@@ -206,7 +206,7 @@
               },
               "caption": {
                 "type": "string",
-                "description": "Text shown before the step runs, until the next caption. The step waits until it can be read."
+                "description": "Text shown before the step runs, until the next caption. The step waits until it can be read. With a voice it's also said, and `[audio tags]` in it are performed but not shown."
               }
             },
             "required": [
@@ -251,7 +251,7 @@
               },
               "caption": {
                 "type": "string",
-                "description": "Text shown before the step runs, until the next caption. The step waits until it can be read."
+                "description": "Text shown before the step runs, until the next caption. The step waits until it can be read. With a voice it's also said, and `[audio tags]` in it are performed but not shown."
               }
             },
             "required": [
@@ -296,7 +296,7 @@
               },
               "caption": {
                 "type": "string",
-                "description": "Text shown before the step runs, until the next caption. The step waits until it can be read."
+                "description": "Text shown before the step runs, until the next caption. The step waits until it can be read. With a voice it's also said, and `[audio tags]` in it are performed but not shown."
               }
             },
             "required": [
@@ -365,7 +365,7 @@
               },
               "caption": {
                 "type": "string",
-                "description": "Text shown before the step runs, until the next caption. The step waits until it can be read."
+                "description": "Text shown before the step runs, until the next caption. The step waits until it can be read. With a voice it's also said, and `[audio tags]` in it are performed but not shown."
               }
             },
             "required": [
@@ -419,7 +419,7 @@
               },
               "caption": {
                 "type": "string",
-                "description": "Text shown before the step runs, until the next caption. The step waits until it can be read."
+                "description": "Text shown before the step runs, until the next caption. The step waits until it can be read. With a voice it's also said, and `[audio tags]` in it are performed but not shown."
               }
             },
             "required": [
@@ -469,7 +469,7 @@
               },
               "caption": {
                 "type": "string",
-                "description": "Text shown before the step runs, until the next caption. The step waits until it can be read."
+                "description": "Text shown before the step runs, until the next caption. The step waits until it can be read. With a voice it's also said, and `[audio tags]` in it are performed but not shown."
               }
             },
             "required": [
@@ -495,7 +495,7 @@
               },
               "caption": {
                 "type": "string",
-                "description": "Text shown before the step runs, until the next caption. The step waits until it can be read."
+                "description": "Text shown before the step runs, until the next caption. The step waits until it can be read. With a voice it's also said, and `[audio tags]` in it are performed but not shown."
               }
             },
             "required": [
@@ -524,7 +524,7 @@
               },
               "caption": {
                 "type": "string",
-                "description": "Text shown before the step runs, until the next caption. The step waits until it can be read."
+                "description": "Text shown before the step runs, until the next caption. The step waits until it can be read. With a voice it's also said, and `[audio tags]` in it are performed but not shown."
               }
             },
             "required": [
@@ -548,7 +548,7 @@
               },
               "caption": {
                 "type": "string",
-                "description": "Text shown before the step runs, until the next caption. The step waits until it can be read."
+                "description": "Text shown before the step runs, until the next caption. The step waits until it can be read. With a voice it's also said, and `[audio tags]` in it are performed but not shown."
               }
             },
             "required": [
@@ -574,7 +574,7 @@
               },
               "caption": {
                 "type": "string",
-                "description": "Text shown before the step runs, until the next caption. The step waits until it can be read."
+                "description": "Text shown before the step runs, until the next caption. The step waits until it can be read. With a voice it's also said, and `[audio tags]` in it are performed but not shown."
               }
             },
             "required": [
@@ -607,7 +607,7 @@
               },
               "caption": {
                 "type": "string",
-                "description": "Text shown before the step runs, until the next caption. The step waits until it can be read."
+                "description": "Text shown before the step runs, until the next caption. The step waits until it can be read. With a voice it's also said, and `[audio tags]` in it are performed but not shown."
               }
             },
             "required": [
@@ -649,7 +649,7 @@
               },
               "caption": {
                 "type": "string",
-                "description": "Text shown before the step runs, until the next caption. The step waits until it can be read."
+                "description": "Text shown before the step runs, until the next caption. The step waits until it can be read. With a voice it's also said, and `[audio tags]` in it are performed but not shown."
               }
             },
             "required": [
@@ -687,7 +687,7 @@
               },
               "caption": {
                 "type": "string",
-                "description": "Text shown before the step runs, until the next caption. The step waits until it can be read."
+                "description": "Text shown before the step runs, until the next caption. The step waits until it can be read. With a voice it's also said, and `[audio tags]` in it are performed but not shown."
               }
             },
             "required": [

@@ -49,11 +49,15 @@ steps:
 showem run demo.yaml
 ```
 
-`showem docs` lists every action, and [`skill/showem/SKILL.md`](skill/showem/SKILL.md) is the full script format. For autocomplete in your editor, add this line at the top of the script:
+`showem docs` lists every action, and [`skill/showem/references/script.md`](skill/showem/references/script.md) is the full script format. For autocomplete in your editor, add this line at the top of the script:
 
 ```yaml
 # yaml-language-server: $schema=https://showem.shaitar.com/schema.json
 ```
+
+## Project settings
+
+To give every demo in a repo the same background, size or style, run `showem init` there. It creates `.showem/config.yaml`, which scripts in the project use unless they set a field themselves. Commit it along with any images it points to. Videos go to `.showem/videos/`, which git ignores. [`examples/project`](examples/project) is a project set up this way.
 
 ## FAQ
 

@@ -4,6 +4,7 @@ export type Schema =
   | { kind: "string"; values?: readonly string[]; pattern?: RegExp; patternHint?: string; doc?: string }
   | { kind: "number"; min?: number; max?: number; doc?: string }
   | { kind: "true"; doc?: string }
+  | { kind: "boolean"; doc?: string }
   | { kind: "either"; options: readonly Schema[]; expected: string; doc?: string }
   | { kind: "list"; items: Schema; doc?: string }
   | { kind: "object"; fields: Readonly<Record<string, Schema>>; required?: readonly string[]; doc?: string }
@@ -21,6 +22,7 @@ export interface Issue {
 
 export const text = (doc?: string, more: Partial<Extract<Schema, { kind: "string" }>> = {}): Schema => ({ kind: "string", doc, ...more });
 export const oneOf = (values: readonly string[], doc?: string): Schema => ({ kind: "string", values, doc });
+export const bool = (doc?: string): Schema => ({ kind: "boolean", doc });
 export const num = (doc?: string, more: { min?: number; max?: number } = {}): Schema => ({ kind: "number", doc, ...more });
 export const list = (items: Schema, doc?: string): Schema => ({ kind: "list", items, doc });
 export const object = (fields: Record<string, Schema>, required: readonly string[] = [], doc?: string): Extract<Schema, { kind: "object" }> => ({ kind: "object", fields, required, doc });
@@ -68,6 +70,8 @@ function expected(schema: Schema): string {
       return "a number";
     case "true":
       return "true";
+    case "boolean":
+      return "true or false";
     case "either":
       return schema.expected;
     case "list":
@@ -88,7 +92,7 @@ function labelOf(path: Path): string {
 export const isObject = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
 /** The kind of value a schema takes, in the terms of `kindOf`. */
-const SCHEMA_KINDS: Record<Schema["kind"], string> = { string: "string", number: "number", true: "boolean", either: "either", list: "list", object: "object", named: "object" };
+const SCHEMA_KINDS: Record<Schema["kind"], string> = { string: "string", number: "number", true: "boolean", boolean: "boolean", either: "either", list: "list", object: "object", named: "object" };
 
 const kindOf = (value: unknown) => (Array.isArray(value) ? "list" : value === null ? "null" : typeof value);
 
@@ -114,6 +118,8 @@ export function check(schema: Schema, value: unknown, path: Path, issues: Issue[
       return value;
     case "true":
       return value === true ? value : wrongType();
+    case "boolean":
+      return typeof value === "boolean" ? value : wrongType();
     case "either": {
       // The option of the same kind as the value, so `zoom: 0.5` says it's too small, not that it isn't a number.
       const option = schema.options.find((o) => SCHEMA_KINDS[o.kind] === kindOf(value));
@@ -164,6 +170,8 @@ export function jsonSchema(schema: Schema): Record<string, unknown> {
       return { type: "number", ...(schema.min !== undefined && { minimum: schema.min }), ...(schema.max !== undefined && { maximum: schema.max }), ...doc };
     case "true":
       return { const: true, ...doc };
+    case "boolean":
+      return { type: "boolean", ...doc };
     case "either":
       return { anyOf: schema.options.map(jsonSchema), ...doc };
     case "list":
