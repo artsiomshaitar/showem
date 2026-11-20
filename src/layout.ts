@@ -1,5 +1,5 @@
 import { FRAME_SPECS } from "./device.ts";
-import { outputOf, styleOf } from "./script.ts";
+import { hiddenSteps, outputOf, shownCaption, styleOf } from "./script.ts";
 import type { Box, FrameKind, Script, Size } from "./types.ts";
 
 export interface Layout extends Size {
@@ -17,7 +17,27 @@ export interface Layout extends Size {
   screen: Box;
   screenRadius: number;
   page: Box;
+  /**
+   * The top of a one-line caption, in canvas pixels, or the canvas height when the script has no captions.
+   * Zoomed shots are framed in the part above it, so what a step does never happens behind its caption.
+   */
+  captionTop: number;
 }
+
+/** Whether any caption shows in the video. */
+function hasCaptions(script: Script) {
+  const hidden = hiddenSteps(script);
+  return script.steps.some((s, i) => !hidden.has(i) && s.caption && shownCaption(script, s.caption));
+}
+
+/** Caption text size in canvas pixels. */
+export const captionSize = (script: Script) => styleOf(script).captionSize ?? Math.round(outputOf(script).height * 0.03);
+
+/** Space between the bottom of a caption and the bottom of the video. */
+export const captionGap = (height: number, padding: number) => (padding + height * 0.04) / 2;
+
+/** Height of a caption box with `lines` lines of text. */
+export const captionHeight = (fontSize: number, lines: number) => lines * fontSize * 1.3 + fontSize;
 
 export function layout(script: Script, screen: { frame: FrameKind; viewport: Size }): Layout {
   const { width, height } = outputOf(script);
@@ -48,5 +68,6 @@ export function layout(script: Script, screen: { frame: FrameKind; viewport: Siz
     screen: { x, y, width: pageWidth, height: pageHeight + toolbar },
     screenRadius: spec.screenRadius === undefined ? windowRadius : spec.screenRadius * fit,
     page: { x, y: y + toolbar, width: pageWidth, height: pageHeight },
+    captionTop: hasCaptions(script) ? height - captionGap(height, pad) - captionHeight(captionSize(script), 1) : height,
   };
 }

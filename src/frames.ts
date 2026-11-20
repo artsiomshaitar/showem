@@ -3,7 +3,7 @@ import { createCanvas, loadImage, type Canvas, type Image, type ImageData, type 
 import type { Camera } from "./camera.ts";
 import { drawBackground, drawCaption, drawChrome, drawCursor, drawMenu, drawOverlay, drawPhoneBody, drawShadow, drawTap, roundedBox } from "./draw.ts";
 import { startEncoder } from "./ffmpeg.ts";
-import type { Layout } from "./layout.ts";
+import { captionSize, type Layout } from "./layout.ts";
 import { easeInOutCubic, springEase } from "./motion.ts";
 import { plan as planOf, type Scene, type ScreenPlan } from "./plan.ts";
 import { outputOf, styleOf } from "./script.ts";
@@ -92,7 +92,8 @@ function blurTaps(plan: ScreenPlan, layout: Layout, t: number, shutterMs: number
   const b = plan.cursor(t - shutterMs);
   const cameraPx =
     Math.abs(Math.log(cam.scale / before.scale)) * layout.page.width +
-    Math.hypot(cam.cx - before.cx, cam.cy - before.cy) * layout.page.width * cam.scale;
+    Math.hypot(cam.cx - before.cx, cam.cy - before.cy) * layout.page.width * cam.scale +
+    Math.abs(cam.lift - before.lift);
   const cursorPx = plan.touch ? 0 : Math.hypot(a.x - b.x, a.y - b.y) * layout.fit * cam.scale;
   return { taps: Math.min(maxTaps, Math.max(1, Math.ceil(Math.max(cameraPx, cursorPx) / BLUR_PX_PER_TAP))), cameraPx };
 }
@@ -133,7 +134,7 @@ export async function renderFrames(job: FrameJob, onFrame?: () => void) {
     screens.set(name, { ...screenPlan, rec: screenRec, shadow, backdrop: drawBackdrop(background, shadow, detail), source: sourceFrames(screenRec, job.dir), menus });
   }
   const screenOf = (name: string) => screens.get(name)!;
-  const captionSize = style.captionSize ?? Math.round(height * 0.03);
+  const fontSize = captionSize(job.script);
 
   /**
    * Draws one screen through its camera. `dx` moves the window sideways (canvas pixels), leaving the background out.
@@ -145,11 +146,19 @@ export async function renderFrames(job: FrameJob, onFrame?: () => void) {
     const { page } = layout;
     ctx.save();
     ctx.globalAlpha = 1;
+    // A lifted window moves over the background, which stays where it is.
+    const lifted = opts.dx === undefined && cam.lift > 0;
+    if (lifted) {
+      ctx.save();
+      applyCamera(ctx, layout, { ...cam, lift: 0 });
+      ctx.drawImage(background, 0, 0, width, height);
+      ctx.restore();
+    }
     ctx.imageSmoothingQuality = "high";
     applyCamera(ctx, layout, cam, opts.dx);
     // Both are soft and only shrunk or enlarged here, where the cheapest filter looks the same and is several times faster.
     ctx.imageSmoothingQuality = "low";
-    if (opts.dx !== undefined) {
+    if (opts.dx !== undefined || lifted) {
       const { canvas: shadow, box } = screen.shadow;
       ctx.drawImage(shadow, box.x, box.y, box.width, box.height);
     } else if (!fillsView(layout, cam, width, height)) {
@@ -203,10 +212,10 @@ export async function renderFrames(job: FrameJob, onFrame?: () => void) {
     }
   }
 
-  /** Sets `ctx` up to draw page canvas points through `cam`, moved `dx` output pixels sideways. */
+  /** Sets `ctx` up to draw page canvas points through `cam`, moved `dx` output pixels sideways and lifted by `cam.lift`. */
   function applyCamera(ctx: SKRSContext2D, layout: Layout, cam: Camera, dx = 0) {
     const center = cameraCenter(layout, cam);
-    ctx.translate(width / 2 + dx, height / 2);
+    ctx.translate(width / 2 + dx, height / 2 - cam.lift);
     ctx.scale(cam.scale, cam.scale);
     ctx.translate(-center.x, -center.y);
   }
@@ -225,7 +234,7 @@ export async function renderFrames(job: FrameJob, onFrame?: () => void) {
     const center = cameraCenter(screen.layout, cam);
     const tips = times.map((tk) => {
       const p = onPage(name, screen.cursor(tk));
-      return { x: width / 2 + cam.scale * (p.x - center.x), y: height / 2 + cam.scale * (p.y - center.y) };
+      return { x: width / 2 + cam.scale * (p.x - center.x), y: height / 2 - cam.lift + cam.scale * (p.y - center.y) };
     });
     // The cursor and its shadow stay well inside this margin around its tip.
     const margin = Math.ceil(POINTER_MARGIN * style.cursorSize * screen.layout.fit * cam.scale);
@@ -324,7 +333,7 @@ export async function renderFrames(job: FrameJob, onFrame?: () => void) {
       outCtx.globalAlpha = 1;
     }
     const caption = plan.captions.find((c) => t >= c.start && t < c.end);
-    if (caption) drawCaption(outCtx, anyLayout, caption, t, captionSize);
+    if (caption) drawCaption(outCtx, anyLayout, caption, t, fontSize);
     await encoder.write(outCtx.getImageData(0, 0, width, height).data);
     onFrame?.();
   }
