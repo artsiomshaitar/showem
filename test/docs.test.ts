@@ -44,7 +44,7 @@ test("an action's docs list its fields, the caption, and an example", () => {
   expect(() => actionDocs("clik")).toThrow('unknown action "clik". Did you mean "click"?');
 });
 
-test("the skill names every action", async () => {
-  const skill = await Bun.file("skill/showem/SKILL.md").text();
+test("the skill's script reference names every action", async () => {
+  const skill = await Bun.file("skill/showem/references/script.md").text();
   expect(Object.keys(ACTIONS).filter((name) => !skill.includes(`\`${name}\``))).toEqual([]);
 });
